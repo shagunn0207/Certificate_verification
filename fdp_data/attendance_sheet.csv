@@ -1,0 +1,427 @@
+FACULTY ID,FACULTY NAME,DATE,ATTENDANCE STATUS
+F012,Dr. Sushma B,07/07/2025,PRESENT
+F012,Dr. Sushma B,08/07/2025,PRESENT
+F012,Dr. Sushma B,09/07/2025,PRESENT
+F012,Dr. Sushma B,10/07/2025,PRESENT
+F012,Dr. Sushma B,11/07/2025,PRESENT
+F012,Dr. Sushma B,14/07/2025,PRESENT
+F015,Dr. Mallegowda M.,14/07/2025,PRESENT
+F019,Nandini S B,14/07/2025,PRESENT
+F021,Dr. Akshata S. Bhayyar,14/07/2025,PRESENT
+F025,Akshatha Kamath,14/07/2025,PRESENT
+F027,Priya K,14/07/2025,PRESENT
+F012,Dr. Sushma B,15/07/2025,PRESENT
+F015,Dr. Mallegowda M.,15/07/2025,PRESENT
+F019,Nandini S B,15/07/2025,PRESENT
+F021,Dr. Akshata S. Bhayyar,15/07/2025,PRESENT
+F025,Akshatha Kamath,15/07/2025,PRESENT
+F027,Priya K,15/07/2025,PRESENT
+F012,Dr. Sushma B,16/07/2025,PRESENT
+F015,Dr. Mallegowda M.,16/07/2025,PRESENT
+F019,Nandini S B,16/07/2025,PRESENT
+F021,Dr. Akshata S. Bhayyar,16/07/2025,PRESENT
+F025,Akshatha Kamath,16/07/2025,PRESENT
+F027,Priya K,16/07/2025,PRESENT
+F012,Dr. Sushma B,17/07/2025,PRESENT
+F015,Dr. Mallegowda M.,17/07/2025,PRESENT
+F019,Nandini S B,17/07/2025,PRESENT
+F021,Dr. Akshata S. Bhayyar,17/07/2025,PRESENT
+F025,Akshatha Kamath,17/07/2025,PRESENT
+F027,Priya K,17/07/2025,PRESENT
+F012,Dr. Sushma B,18/07/2025,PRESENT
+F015,Dr. Mallegowda M.,18/07/2025,PRESENT
+F019,Nandini S B,18/07/2025,PRESENT
+F021,Dr. Akshata S. Bhayyar,18/07/2025,PRESENT
+F025,Akshatha Kamath,18/07/2025,PRESENT
+F027,Priya K,18/07/2025,PRESENT
+F012,Dr. Sushma B,19/07/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,19/07/2025,HOLIDAY
+F025,Akshatha Kamath,19/07/2025,HOLIDAY
+F012,Dr. Sushma B,20/07/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,20/07/2025,HOLIDAY
+F025,Akshatha Kamath,20/07/2025,HOLIDAY
+F012,Dr. Sushma B,21/07/2025,OOD
+F021,Dr. Akshata S. Bhayyar,21/07/2025,OOD
+F025,Akshatha Kamath,21/07/2025,OOD
+F012,Dr. Sushma B,22/07/2025,OOD
+F021,Dr. Akshata S. Bhayyar,22/07/2025,OOD
+F025,Akshatha Kamath,22/07/2025,OOD
+F012,Dr. Sushma B,23/07/2025,OOD
+F021,Dr. Akshata S. Bhayyar,23/07/2025,OOD
+F025,Akshatha Kamath,23/07/2025,OOD
+F012,Dr. Sushma B,24/07/2025,OOD
+F021,Dr. Akshata S. Bhayyar,24/07/2025,OOD
+F025,Akshatha Kamath,24/07/2025,OOD
+F012,Dr. Sushma B,25/07/2025,OOD
+F021,Dr. Akshata S. Bhayyar,25/07/2025,OOD
+F025,Akshatha Kamath,25/07/2025,OOD
+F021,Dr. Akshata S. Bhayyar,26/07/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,27/07/2025,HOLIDAY
+F011,Dr. Ganeshayya Shidaganti,28/07/2025,OOD
+F015,Dr. Mallegowda M.,28/07/2025,OOD
+F021,Dr. Akshata S. Bhayyar,28/07/2025,OOD
+F011,Dr. Ganeshayya Shidaganti,29/07/2025,OOD
+F015,Dr. Mallegowda M.,29/07/2025,OOD
+F021,Dr. Akshata S. Bhayyar,29/07/2025,OOD
+F011,Dr. Ganeshayya Shidaganti,30/07/2025,OOD
+F015,Dr. Mallegowda M.,30/07/2025,OOD
+F021,Dr. Akshata S. Bhayyar,30/07/2025,OOD
+F011,Dr. Ganeshayya Shidaganti,31/07/2025,OOD
+F015,Dr. Mallegowda M.,31/07/2025,CASUAL LEAVE
+F021,Dr. Akshata S. Bhayyar,31/07/2025,OOD
+F011,Dr. Ganeshayya Shidaganti,01/08/2025,OOD
+F015,Dr. Mallegowda M.,01/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,01/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,02/08/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,03/08/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,04/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,05/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,06/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,07/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,08/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,09/08/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,10/08/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,11/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,12/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,13/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,14/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,15/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,16/08/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,17/08/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,18/08/2025,OOD
+F027,Priya K,18/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,19/08/2025,OOD
+F027,Priya K,19/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,20/08/2025,OOD
+F027,Priya K,20/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,21/08/2025,OOD
+F027,Priya K,21/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,22/08/2025,OOD
+F027,Priya K,22/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,23/08/2025,HOLIDAY
+F027,Priya K,23/08/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,24/08/2025,HOLIDAY
+F027,Priya K,24/08/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,25/08/2025,OOD
+F027,Priya K,25/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,26/08/2025,OOD
+F027,Priya K,26/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,27/08/2025,OOD
+F027,Priya K,27/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,28/08/2025,OOD
+F027,Priya K,28/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,29/08/2025,OOD
+F027,Priya K,29/08/2025,OOD
+F021,Dr. Akshata S. Bhayyar,30/08/2025,HOLIDAY
+F027,Priya K,30/08/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,31/08/2025,HOLIDAY
+F027,Priya K,31/08/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,01/09/2025,OOD
+F027,Priya K,01/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,02/09/2025,OOD
+F027,Priya K,02/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,03/09/2025,OOD
+F027,Priya K,03/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,04/09/2025,OOD
+F027,Priya K,04/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,05/09/2025,OOD
+F027,Priya K,05/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,06/09/2025,HOLIDAY
+F027,Priya K,06/09/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,07/09/2025,HOLIDAY
+F027,Priya K,07/09/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,08/09/2025,OOD
+F027,Priya K,08/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,09/09/2025,OOD
+F027,Priya K,09/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,10/09/2025,OOD
+F027,Priya K,10/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,11/09/2025,OOD
+F027,Priya K,11/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,12/09/2025,OOD
+F027,Priya K,12/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,13/09/2025,HOLIDAY
+F027,Priya K,13/09/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,14/09/2025,HOLIDAY
+F027,Priya K,14/09/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,15/09/2025,OOD
+F027,Priya K,15/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,16/09/2025,OOD
+F027,Priya K,16/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,17/09/2025,OOD
+F027,Priya K,17/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,18/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,19/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,20/09/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,21/09/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,22/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,23/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,24/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,25/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,26/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,27/09/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,28/09/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,29/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,30/09/2025,OOD
+F021,Dr. Akshata S. Bhayyar,01/10/2025,OOD
+F021,Dr. Akshata S. Bhayyar,02/10/2025,OOD
+F021,Dr. Akshata S. Bhayyar,03/10/2025,OOD
+F021,Dr. Akshata S. Bhayyar,04/10/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,05/10/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,06/10/2025,OOD
+F021,Dr. Akshata S. Bhayyar,07/10/2025,OOD
+F021,Dr. Akshata S. Bhayyar,08/10/2025,OOD
+F021,Dr. Akshata S. Bhayyar,09/10/2025,OOD
+F021,Dr. Akshata S. Bhayyar,10/10/2025,OOD
+F021,Dr. Akshata S. Bhayyar,11/10/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,12/10/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,13/10/2025,OOD
+F021,Dr. Akshata S. Bhayyar,14/10/2025,OOD
+F021,Dr. Akshata S. Bhayyar,15/10/2025,OOD
+F021,Dr. Akshata S. Bhayyar,16/10/2025,OOD
+F021,Dr. Akshata S. Bhayyar,17/10/2025,OOD
+F021,Dr. Akshata S. Bhayyar,18/10/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,19/10/2025,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,20/10/2025,OOD
+F021,Dr. Akshata S. Bhayyar,21/10/2025,OOD
+F021,Dr. Akshata S. Bhayyar,22/10/2025,OOD
+F021,Dr. Akshata S. Bhayyar,23/10/2025,OOD
+F021,Dr. Akshata S. Bhayyar,24/10/2025,OOD
+F021,Dr. Akshata S. Bhayyar,25/10/2025,HOLIDAY
+F012,Dr. Sushma B,05/11/2025,OOD
+F012,Dr. Sushma B,06/11/2025,OOD
+F012,Dr. Sushma B,07/11/2025,OOD
+F012,Dr. Sushma B,08/11/2025,EMERGENCY LEAVE
+F012,Dr. Sushma B,09/11/2025,HOLIDAY
+F015,Dr. Mallegowda M.,17/11/2025,OOD
+F015,Dr. Mallegowda M.,18/11/2025,OOD
+F015,Dr. Mallegowda M.,19/11/2025,HOLIDAY
+F015,Dr. Mallegowda M.,20/11/2025,OOD
+F015,Dr. Mallegowda M.,21/11/2025,OOD
+F015,Dr. Mallegowda M.,22/11/2025,HOLIDAY
+F003,Dr. Shilpa Shashikant Chaudhari,08/12/2025,OOD
+F003,Dr. Shilpa Shashikant Chaudhari,09/12/2025,OOD
+F003,Dr. Shilpa Shashikant Chaudhari,10/12/2025,OOD
+F003,Dr. Shilpa Shashikant Chaudhari,11/12/2025,OOD
+F003,Dr. Shilpa Shashikant Chaudhari,12/12/2025,OOD
+F003,Dr. Shilpa Shashikant Chaudhari,13/12/2025,HOLIDAY
+F003,Dr. Shilpa Shashikant Chaudhari,14/12/2025,HOLIDAY
+F003,Dr. Shilpa Shashikant Chaudhari,15/12/2025,OOD
+F003,Dr. Shilpa Shashikant Chaudhari,16/12/2025,OOD
+F003,Dr. Shilpa Shashikant Chaudhari,17/12/2025,OOD
+F003,Dr. Shilpa Shashikant Chaudhari,18/12/2025,OOD
+F003,Dr. Shilpa Shashikant Chaudhari,19/12/2025,OOD
+F003,Dr. Shilpa Shashikant Chaudhari,20/12/2025,VACATION
+F003,Dr. Shilpa Shashikant Chaudhari,21/12/2025,VACATION
+F003,Dr. Shilpa Shashikant Chaudhari,22/12/2025,VACATION
+F003,Dr. Shilpa Shashikant Chaudhari,23/12/2025,VACATION
+F003,Dr. Shilpa Shashikant Chaudhari,24/12/2025,VACATION
+F003,Dr. Shilpa Shashikant Chaudhari,25/12/2025,VACATION
+F003,Dr. Shilpa Shashikant Chaudhari,26/12/2025,VACATION
+F003,Dr. Shilpa Shashikant Chaudhari,27/12/2025,VACATION
+F003,Dr. Shilpa Shashikant Chaudhari,28/12/2025,VACATION
+F003,Dr. Shilpa Shashikant Chaudhari,29/12/2025,VACATION
+F003,Dr. Shilpa Shashikant Chaudhari,30/12/2025,VACATION
+F003,Dr. Shilpa Shashikant Chaudhari,31/12/2025,VACATION
+F012,Dr. Sushma B,05/01/2026,OOD
+F031,Swetha M,05/01/2026,PRESENT
+F012,Dr. Sushma B,06/01/2026,OOD
+F031,Swetha M,06/01/2026,PRESENT
+F012,Dr. Sushma B,07/01/2026,OOD
+F031,Swetha M,07/01/2026,PRESENT
+F012,Dr. Sushma B,08/01/2026,OOD
+F031,Swetha M,08/01/2026,PRESENT
+F012,Dr. Sushma B,09/01/2026,OOD
+F031,Swetha M,09/01/2026,PRESENT
+F012,Dr. Sushma B,10/01/2026,HOLIDAY
+F031,Swetha M,27/01/2026,PRESENT
+F031,Swetha M,28/01/2026,PRESENT
+F031,Swetha M,29/01/2026,PRESENT
+F031,Swetha M,30/01/2026,PRESENT
+F031,Swetha M,31/01/2026,HOLIDAY
+F012,Dr. Sushma B,02/02/2026,PRESENT
+F015,Dr. Mallegowda M.,02/02/2026,PRESENT
+F021,Dr. Akshata S. Bhayyar,02/02/2026,PRESENT
+F022,Mamatha A,02/02/2026,PRESENT
+F027,Priya K,02/02/2026,PRESENT
+F031,Swetha M,02/02/2026,PRESENT
+F012,Dr. Sushma B,03/02/2026,PRESENT
+F015,Dr. Mallegowda M.,03/02/2026,PRESENT
+F021,Dr. Akshata S. Bhayyar,03/02/2026,PRESENT
+F022,Mamatha A,03/02/2026,PRESENT
+F027,Priya K,03/02/2026,PRESENT
+F031,Swetha M,03/02/2026,PRESENT
+F012,Dr. Sushma B,04/02/2026,PRESENT
+F015,Dr. Mallegowda M.,04/02/2026,PRESENT
+F021,Dr. Akshata S. Bhayyar,04/02/2026,PRESENT
+F022,Mamatha A,04/02/2026,PRESENT
+F027,Priya K,04/02/2026,PRESENT
+F031,Swetha M,04/02/2026,PRESENT
+F012,Dr. Sushma B,05/02/2026,PRESENT
+F015,Dr. Mallegowda M.,05/02/2026,PRESENT
+F021,Dr. Akshata S. Bhayyar,05/02/2026,PRESENT
+F022,Mamatha A,05/02/2026,PRESENT
+F027,Priya K,05/02/2026,PRESENT
+F031,Swetha M,05/02/2026,PRESENT
+F012,Dr. Sushma B,06/02/2026,PRESENT
+F015,Dr. Mallegowda M.,06/02/2026,PRESENT
+F021,Dr. Akshata S. Bhayyar,06/02/2026,PRESENT
+F022,Mamatha A,06/02/2026,PRESENT
+F027,Priya K,06/02/2026,PRESENT
+F031,Swetha M,06/02/2026,PRESENT
+F021,Dr. Akshata S. Bhayyar,07/02/2026,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,08/02/2026,HOLIDAY
+F011,Dr. Ganeshayya Shidaganti,09/02/2026,OOD
+F021,Dr. Akshata S. Bhayyar,09/02/2026,PRESENT
+F011,Dr. Ganeshayya Shidaganti,10/02/2026,OOD
+F021,Dr. Akshata S. Bhayyar,10/02/2026,PRESENT
+F011,Dr. Ganeshayya Shidaganti,11/02/2026,OOD
+F021,Dr. Akshata S. Bhayyar,11/02/2026,PRESENT
+F011,Dr. Ganeshayya Shidaganti,12/02/2026,OOD
+F021,Dr. Akshata S. Bhayyar,12/02/2026,PRESENT
+F011,Dr. Ganeshayya Shidaganti,13/02/2026,OOD
+F021,Dr. Akshata S. Bhayyar,13/02/2026,PRESENT
+F021,Dr. Akshata S. Bhayyar,14/02/2026,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,15/02/2026,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,16/02/2026,PRESENT
+F021,Dr. Akshata S. Bhayyar,17/02/2026,PRESENT
+F021,Dr. Akshata S. Bhayyar,18/02/2026,PRESENT
+F021,Dr. Akshata S. Bhayyar,19/02/2026,PRESENT
+F021,Dr. Akshata S. Bhayyar,20/02/2026,PRESENT
+F021,Dr. Akshata S. Bhayyar,21/02/2026,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,22/02/2026,HOLIDAY
+F010,Dr Sangeetha.V,23/02/2026,OOD
+F021,Dr. Akshata S. Bhayyar,23/02/2026,PRESENT
+F010,Dr Sangeetha.V,24/02/2026,OOD
+F021,Dr. Akshata S. Bhayyar,24/02/2026,PRESENT
+F010,Dr Sangeetha.V,25/02/2026,OOD
+F021,Dr. Akshata S. Bhayyar,25/02/2026,PRESENT
+F010,Dr Sangeetha.V,26/02/2026,OOD
+F021,Dr. Akshata S. Bhayyar,26/02/2026,PRESENT
+F010,Dr Sangeetha.V,27/02/2026,OOD
+F021,Dr. Akshata S. Bhayyar,27/02/2026,PRESENT
+F010,Dr Sangeetha.V,28/02/2026,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,28/02/2026,HOLIDAY
+F010,Dr Sangeetha.V,01/03/2026,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,01/03/2026,HOLIDAY
+F010,Dr Sangeetha.V,02/03/2026,OOD
+F021,Dr. Akshata S. Bhayyar,02/03/2026,PRESENT
+F010,Dr Sangeetha.V,03/03/2026,OOD
+F021,Dr. Akshata S. Bhayyar,03/03/2026,PRESENT
+F010,Dr Sangeetha.V,04/03/2026,OOD
+F021,Dr. Akshata S. Bhayyar,04/03/2026,PRESENT
+F010,Dr Sangeetha.V,05/03/2026,OOD
+F021,Dr. Akshata S. Bhayyar,05/03/2026,PRESENT
+F010,Dr Sangeetha.V,06/03/2026,OOD
+F021,Dr. Akshata S. Bhayyar,06/03/2026,PRESENT
+F010,Dr Sangeetha.V,07/03/2026,HOLIDAY
+F010,Dr Sangeetha.V,08/03/2026,HOLIDAY
+F010,Dr Sangeetha.V,09/03/2026,OOD
+F010,Dr Sangeetha.V,10/03/2026,OOD
+F021,Dr. Akshata S. Bhayyar,10/03/2026,OOD
+F010,Dr Sangeetha.V,11/03/2026,OOD
+F021,Dr. Akshata S. Bhayyar,11/03/2026,OOD
+F010,Dr Sangeetha.V,12/03/2026,OOD
+F021,Dr. Akshata S. Bhayyar,12/03/2026,UNPAID LEAVE
+F010,Dr Sangeetha.V,13/03/2026,OOD
+F021,Dr. Akshata S. Bhayyar,13/03/2026,OOD
+F010,Dr Sangeetha.V,14/03/2026,HOLIDAY
+F021,Dr. Akshata S. Bhayyar,14/03/2026,HOLIDAY
+F010,Dr Sangeetha.V,15/03/2026,HOLIDAY
+F010,Dr Sangeetha.V,16/03/2026,OOD
+F010,Dr Sangeetha.V,17/03/2026,OOD
+F010,Dr Sangeetha.V,18/03/2026,OOD
+F010,Dr Sangeetha.V,19/03/2026,OOD
+F010,Dr Sangeetha.V,20/03/2026,OOD
+F010,Dr Sangeetha.V,21/03/2026,HOLIDAY
+F010,Dr Sangeetha.V,22/03/2026,HOLIDAY
+F010,Dr Sangeetha.V,23/03/2026,OOD
+F010,Dr Sangeetha.V,24/03/2026,OOD
+F010,Dr Sangeetha.V,25/03/2026,OOD
+F010,Dr Sangeetha.V,26/03/2026,OOD
+F010,Dr Sangeetha.V,27/03/2026,OOD
+F013,Dr. DEVARAJU B M,15/06/2026,PRESENT
+F011,Dr. Ganeshayya Shidaganti,16/06/2026,OOD
+F013,Dr. DEVARAJU B M,16/06/2026,PRESENT
+F011,Dr. Ganeshayya Shidaganti,17/06/2026,OOD
+F013,Dr. DEVARAJU B M,17/06/2026,PRESENT
+F011,Dr. Ganeshayya Shidaganti,18/06/2026,PRESENT
+F013,Dr. DEVARAJU B M,18/06/2026,PRESENT
+F011,Dr. Ganeshayya Shidaganti,19/06/2026,PRESENT
+F013,Dr. DEVARAJU B M,19/06/2026,PRESENT
+F027,Priya K,29/06/2026,OOD
+F027,Priya K,30/06/2026,OOD
+F027,Priya K,01/07/2026,OOD
+F027,Priya K,02/07/2026,OOD
+F027,Priya K,03/07/2026,OOD
+F007,Dr. S. Rajarajeswari,06/07/2026,PRESENT
+F012,Dr. Sushma B,06/07/2026,PRESENT
+F013,Dr. DEVARAJU B M,06/07/2026,PRESENT
+F027,Priya K,06/07/2026,PRESENT
+F007,Dr. S. Rajarajeswari,07/07/2026,PRESENT
+F012,Dr. Sushma B,07/07/2026,PRESENT
+F013,Dr. DEVARAJU B M,07/07/2026,PRESENT
+F027,Priya K,07/07/2026,PRESENT
+F007,Dr. S. Rajarajeswari,08/07/2026,PRESENT
+F012,Dr. Sushma B,08/07/2026,PRESENT
+F013,Dr. DEVARAJU B M,08/07/2026,PRESENT
+F027,Priya K,08/07/2026,PRESENT
+F007,Dr. S. Rajarajeswari,09/07/2026,PRESENT
+F012,Dr. Sushma B,09/07/2026,PRESENT
+F013,Dr. DEVARAJU B M,09/07/2026,PRESENT
+F027,Priya K,09/07/2026,PRESENT
+F007,Dr. S. Rajarajeswari,10/07/2026,PRESENT
+F012,Dr. Sushma B,10/07/2026,PRESENT
+F013,Dr. DEVARAJU B M,10/07/2026,PRESENT
+F027,Priya K,10/07/2026,PRESENT
+F007,Dr. S. Rajarajeswari,13/07/2026,PRESENT
+F013,Dr. DEVARAJU B M,13/07/2026,PRESENT
+F007,Dr. S. Rajarajeswari,14/07/2026,PRESENT
+F013,Dr. DEVARAJU B M,14/07/2026,PRESENT
+F007,Dr. S. Rajarajeswari,15/07/2026,PRESENT
+F013,Dr. DEVARAJU B M,15/07/2026,PRESENT
+F007,Dr. S. Rajarajeswari,16/07/2026,PRESENT
+F013,Dr. DEVARAJU B M,16/07/2026,PRESENT
+F007,Dr. S. Rajarajeswari,17/07/2026,PRESENT
+F013,Dr. DEVARAJU B M,17/07/2026,PRESENT
+F007,Dr. S. Rajarajeswari,18/07/2026,HOLIDAY
+F007,Dr. S. Rajarajeswari,19/07/2026,HOLIDAY
+F007,Dr. S. Rajarajeswari,20/07/2026,PRESENT
+F007,Dr. S. Rajarajeswari,21/07/2026,PRESENT
+F007,Dr. S. Rajarajeswari,22/07/2026,PRESENT
+F007,Dr. S. Rajarajeswari,23/07/2026,PRESENT
+F007,Dr. S. Rajarajeswari,24/07/2026,PRESENT
+F007,Dr. S. Rajarajeswari,25/07/2026,HOLIDAY
+F007,Dr. S. Rajarajeswari,26/07/2026,HOLIDAY
+F007,Dr. S. Rajarajeswari,27/07/2026,PRESENT
+F007,Dr. S. Rajarajeswari,28/07/2026,PRESENT
+F025,Akshatha Kamath,28/07/2026,OOD
+F007,Dr. S. Rajarajeswari,29/07/2026,PRESENT
+F025,Akshatha Kamath,29/07/2026,OOD
+F007,Dr. S. Rajarajeswari,30/07/2026,PRESENT
+F007,Dr. S. Rajarajeswari,31/07/2026,PRESENT
+F025,Akshatha Kamath,31/07/2026,OOD
+F007,Dr. S. Rajarajeswari,01/08/2026,HOLIDAY
+F025,Akshatha Kamath,01/08/2026,HOLIDAY
+F007,Dr. S. Rajarajeswari,02/08/2026,HOLIDAY
+F007,Dr. S. Rajarajeswari,03/08/2026,PRESENT
+F032,Sahil Kumar Jamwal,03/08/2026,PRESENT
+F007,Dr. S. Rajarajeswari,04/08/2026,PRESENT
+F032,Sahil Kumar Jamwal,04/08/2026,PRESENT
+F007,Dr. S. Rajarajeswari,05/08/2026,PRESENT
+F032,Sahil Kumar Jamwal,05/08/2026,PRESENT
+F007,Dr. S. Rajarajeswari,06/08/2026,PRESENT
+F032,Sahil Kumar Jamwal,06/08/2026,PRESENT
+F007,Dr. S. Rajarajeswari,07/08/2026,PRESENT
+F032,Sahil Kumar Jamwal,07/08/2026,PRESENT
+F007,Dr. S. Rajarajeswari,08/08/2026,HOLIDAY
+F007,Dr. S. Rajarajeswari,09/08/2026,HOLIDAY
+F007,Dr. S. Rajarajeswari,10/08/2026,PRESENT
+F007,Dr. S. Rajarajeswari,11/08/2026,PRESENT
+F007,Dr. S. Rajarajeswari,12/08/2026,PRESENT
+F007,Dr. S. Rajarajeswari,13/08/2026,PRESENT
+F007,Dr. S. Rajarajeswari,14/08/2026,PRESENT
+F007,Dr. S. Rajarajeswari,15/08/2026,HOLIDAY
+F007,Dr. S. Rajarajeswari,16/08/2026,HOLIDAY
+F007,Dr. S. Rajarajeswari,17/08/2026,PRESENT
+F007,Dr. S. Rajarajeswari,18/08/2026,PRESENT
