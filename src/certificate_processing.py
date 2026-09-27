@@ -40,9 +40,14 @@ class CertificateProcessor:
 
         # OCR / Text extraction
         raw_text = self.ocr_processor.extract_raw_text(saved_path, filename)
-        
+
+        # Faculty lookup map for text-scan fallback {fid: official_name}
+        faculty_master_map = dict(self.data_loader.faculty_by_id) if self.data_loader.faculty_by_id else {}
+
         # Parse fields
-        parsed = self.ocr_processor.parse_certificate_text(raw_text, fallback_meta=fallback_meta)
+        parsed = self.ocr_processor.parse_certificate_text(
+            raw_text, fallback_meta=fallback_meta, faculty_master=faculty_master_map
+        )
         parsed['SAVED_FILE_PATH'] = saved_path
         parsed['FILENAME'] = filename
 
