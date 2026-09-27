@@ -1,4 +1,5 @@
 import os
+import io
 import re
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
@@ -15,6 +16,18 @@ try:
     HAS_PYPDF = True
 except ImportError:
     HAS_PYPDF = False
+
+try:
+    import pypdfium2 as pdfium
+    HAS_PDFIUM = True
+except ImportError:
+    HAS_PDFIUM = False
+
+try:
+    from rapidocr_onnxruntime import RapidOCR
+    HAS_RAPIDOCR = True
+except ImportError:
+    HAS_RAPIDOCR = False
 
 try:
     from PIL import Image
@@ -44,6 +57,13 @@ def _clean_text(raw: str) -> Tuple[str, str]:
 
 class CertificateOCRProcessor:
     def __init__(self, tesseract_cmd: Optional[str] = None):
+        self.rapid_ocr = None
+        if HAS_RAPIDOCR:
+            try:
+                self.rapid_ocr = RapidOCR()
+            except Exception:
+                self.rapid_ocr = None
+
         self.tesseract_available = False
         if HAS_PYTESSERACT:
             if tesseract_cmd and os.path.exists(tesseract_cmd):
@@ -61,6 +81,32 @@ class CertificateOCRProcessor:
                         self.tesseract_available = True
                         break
 
+    def _ocr_image(self, img) -> str:
+        """
+        Extracts text from an image (PIL Image, numpy array, or bytes)
+        using RapidOCR (preferred) with fallback to pytesseract.
+        """
+        if self.rapid_ocr:
+            try:
+                import numpy as np
+                if hasattr(img, 'convert'):
+                    arr = np.array(img.convert('RGB'))
+                else:
+                    arr = np.array(img)
+                res, _ = self.rapid_ocr(arr)
+                if res:
+                    return "\n".join(line[1] for line in res if line and len(line) > 1)
+            except Exception:
+                pass
+
+        if self.tesseract_available and HAS_PYTESSERACT:
+            try:
+                return pytesseract.image_to_string(img).strip()
+            except Exception:
+                pass
+
+        return ""
+
     # ------------------------------------------------------------------
     # TEXT EXTRACTION
     # ------------------------------------------------------------------
@@ -70,6 +116,7 @@ class CertificateOCRProcessor:
         text = ""
 
         if ext == 'pdf':
+            # 1. Try digital text extraction with pdfplumber
             if HAS_PDFPLUMBER:
                 try:
                     with pdfplumber.open(file_path_or_bytes) as pdf:
@@ -77,6 +124,7 @@ class CertificateOCRProcessor:
                 except Exception:
                     text = ""
 
+            # 2. Fallback to pypdf for digital text
             if not text.strip() and HAS_PYPDF:
                 try:
                     reader = pypdf.PdfReader(file_path_or_bytes)
@@ -84,15 +132,29 @@ class CertificateOCRProcessor:
                 except Exception:
                     text = ""
 
+            # 3. If digital text is empty, it's a scanned/image PDF!
+            # Render pages with pypdfium2 and OCR with RapidOCR
+            if not text.strip() and HAS_PDFIUM:
+                try:
+                    doc = pdfium.PdfDocument(file_path_or_bytes)
+                    pages_text = []
+                    for page in doc:
+                        pil_img = page.render(scale=2).to_pil()
+                        page_ocr = self._ocr_image(pil_img)
+                        if page_ocr:
+                            pages_text.append(page_ocr)
+                    text = "\n".join(pages_text)
+                except Exception:
+                    pass
+
         elif ext in ['jpg', 'jpeg', 'png']:
             if HAS_PIL:
                 try:
-                    img = Image.open(file_path_or_bytes)
-                    if self.tesseract_available and HAS_PYTESSERACT:
-                        text = pytesseract.image_to_string(img)
+                    if isinstance(file_path_or_bytes, bytes):
+                        img = Image.open(io.BytesIO(file_path_or_bytes))
                     else:
-                        info = getattr(img, 'info', {})
-                        text = " ".join(str(v) for v in info.values() if isinstance(v, str))
+                        img = Image.open(file_path_or_bytes)
+                    text = self._ocr_image(img)
                 except Exception:
                     text = ""
 
@@ -135,6 +197,15 @@ class CertificateOCRProcessor:
         flat, cleaned_raw = _clean_text(text)
         # Normalise dashes so all date regexes work with plain hyphen
         flat = flat.replace('\u2013', '-').replace('\u2014', '-')
+        # OCR digit correction: lowercase 'l' misread as '1' in date strings
+        flat = re.sub(r'\bl(\d)', r'1\1', flat)
+        # OCR ordinal correction: superscript misread as " " / # / h after digit
+        # e.g. '14"' → '14', '2#' → '2', '6h ' → '6 ', '2nd' ordinals kept as-is
+        flat = re.sub(r'(\d+)["\u201d\u2019]([\s-])', r'\1\2', flat)
+        flat = re.sub(r'(\d+)["\u201d\u2019](-)', r'\1\2', flat)
+        flat = re.sub(r'(\d+)#(\s)', r'\1\2', flat)       # "2# " → "2 "
+        flat = re.sub(r'(\d+)h(\s)', r'\1\2', flat)       # "6h " → "6 "
+        flat = re.sub(r'(\d+)h(-)', r'\1\2', flat)        # "6h-" → "6-"
 
         # ==============================================================
         # 1. FACULTY ID
@@ -152,11 +223,24 @@ class CertificateOCRProcessor:
         if not found_start or not found_end:
             # Pattern 0 (HIGHEST PRIORITY): "Month D1 - D2, YYYY"  e.g. "July 14 - 25, 2025"
             m = re.search(
-                r'([A-Za-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?\s*[-]\s*(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{4})',
+                r'([A-Za-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?\s*(?:-|–|to)\s*(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{4})',
                 flat, re.IGNORECASE
             )
             if m:
                 mon, d1, d2, yr = m.group(1), m.group(2), m.group(3), m.group(4)
+                ns = normalize_date_to_ddmmyyyy(f"{d1} {mon} {yr}")
+                ne = normalize_date_to_ddmmyyyy(f"{d2} {mon} {yr}")
+                if ns and ne:
+                    found_start, found_end = ns, ne
+
+        if not found_start or not found_end:
+            # Pattern 0b: "D1 - D2 Month, YYYY"  e.g. "14 - 18 July 2025", "15th - 19th June, 2026"
+            m = re.search(
+                r'(\d{1,2})(?:st|nd|rd|th)?\s*(?:-|–|to)\s*(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9}),?\s*(\d{4})',
+                flat, re.IGNORECASE
+            )
+            if m:
+                d1, d2, mon, yr = m.group(1), m.group(2), m.group(3), m.group(4)
                 ns = normalize_date_to_ddmmyyyy(f"{d1} {mon} {yr}")
                 ne = normalize_date_to_ddmmyyyy(f"{d2} {mon} {yr}")
                 if ns and ne:
@@ -241,79 +325,139 @@ class CertificateOCRProcessor:
 
         # ==============================================================
         # 3. FACULTY NAME
+        # Priority order:
+        #   A. Master-list text scan (most reliable — matches official names)
+        #   B. Regex patterns for various certificate layouts
         # ==============================================================
-        if not result["FACULTY NAME"]:
-            for pat in [
-                r'(?:certified that|certify that|presented to|awarded to)\s+(?:Dr\.|Prof\.|Mr\.|Ms\.|Mrs\.)?\s*([A-Z][a-zA-Z\. ]{2,35})',
-                r'\b(Dr\.\s+[A-Z][a-zA-Z\s\.]{1,28})\b',
-                r'\b(Prof\.\s+[A-Z][a-zA-Z\s\.]{1,28})\b',
-            ]:
-                m = re.search(pat, flat, re.IGNORECASE)
-                if m:
-                    cand = m.group(1).strip()
-                    if "institute" not in cand.lower() and "college" not in cand.lower() and len(cand) > 2:
-                        result["FACULTY NAME"] = cand
-                        break
 
-        # Master-list text scan fallback
+        # A. Master-list scan FIRST — normalise dots so "Sushma.B" == "Sushma B"
         if faculty_master and not result["FACULTY NAME"]:
-            flat_lower = flat.lower()
+            flat_normalised = re.sub(r'[^a-z0-9\s]', ' ', flat.lower())
+            flat_normalised = re.sub(r'\s+', ' ', flat_normalised)
+            
+            # 1. Substring match
             for fid, official_name in faculty_master.items():
-                check = official_name.lower().replace('dr.', '').replace('.', '').strip()
-                if check and check in flat_lower:
+                check = re.sub(r'^(dr|prof|mr|ms|mrs)\s+', '', official_name.lower()).strip()
+                check_clean = re.sub(r'[^a-z0-9\s]', ' ', check)
+                check_clean = re.sub(r'\s+', ' ', check_clean).strip()
+                if check_clean and len(check_clean) > 3 and check_clean in flat_normalised:
                     result["FACULTY NAME"] = official_name
                     if not result["FACULTY ID"]:
                         result["FACULTY ID"] = fid
                     break
 
+            # 2. Token overlap (e.g. Shilpa Shashikant of Chaudhari -> Shilpa, Shashikant, Chaudhari)
+            if not result["FACULTY NAME"]:
+                flat_words = set(w for w in flat_normalised.split() if len(w) >= 3)
+                for fid, official_name in faculty_master.items():
+                    check = re.sub(r'^(dr|prof|mr|ms|mrs)\s+', '', official_name.lower()).strip()
+                    name_words = [w for w in re.sub(r'[^a-z0-9\s]', ' ', check).split() if len(w) >= 3]
+                    overlap = sum(1 for w in name_words if w in flat_words)
+                    if len(name_words) >= 2 and overlap >= 2:
+                        result["FACULTY NAME"] = official_name
+                        if not result["FACULTY ID"]:
+                            result["FACULTY ID"] = fid
+                        break
+                    elif len(name_words) == 1 and overlap == 1 and len(name_words[0]) >= 6:
+                        result["FACULTY NAME"] = official_name
+                        if not result["FACULTY ID"]:
+                            result["FACULTY ID"] = fid
+                        break
+
+            # 3. Fuzzy token scan (handles OCR artifacts like "Aks habhaKamath" -> "Akshatha Kamath")
+            if not result["FACULTY NAME"]:
+                import difflib
+                flat_tokens = [w for w in flat_normalised.split() if len(w) >= 4]
+                for fid, official_name in faculty_master.items():
+                    check = re.sub(r'^(dr|prof|mr|ms|mrs)\s+', '', official_name.lower()).strip()
+                    name_tokens = [w for w in re.sub(r'[^a-z0-9\s]', ' ', check).split() if len(w) >= 4]
+                    matches = 0
+                    for nt in name_tokens:
+                        if any(nt in ft or ft in nt or difflib.SequenceMatcher(None, nt, ft).ratio() >= 0.72 for ft in flat_tokens):
+                            matches += 1
+                    if len(name_tokens) >= 1 and matches >= len(name_tokens):
+                        result["FACULTY NAME"] = official_name
+                        if not result["FACULTY ID"]:
+                            result["FACULTY ID"] = fid
+                        break
+
+        # B. Regex fallback patterns
+        if not result["FACULTY NAME"]:
+            for pat in [
+                # MSRIT internal layout: "Certify that Dr./ Mr./ Mrs./ Ms. Sushma.B" or "Ms.Aks habhaKamath"
+                r'(?:certified that|certify that|presented to|awarded to)\s+'
+                r'(?:(?:Dr|Prof|Mr|Ms|Mrs)\.?\s*[\/\-]\s*)*(?:Dr|Prof|Mr|Ms|Mrs)\.?\s*'
+                r'([A-Za-z][a-zA-Z\.\s]{1,35})',
+                # Simple "Certify that Dr. Name"
+                r'(?:certified that|certify that|presented to|awarded to)\s+'
+                r'(?:Dr\.|Prof\.|Mr\.|Ms\.|Mrs\.)\s+([A-Z][a-zA-Z\. ]{2,35})',
+                r'\b(?:Dr\.|Prof\.)\s+([A-Z][a-zA-Z\s\.]{2,28})\b',
+            ]:
+                m = re.search(pat, flat, re.IGNORECASE)
+                if m:
+                    cand = m.group(1).strip()
+                    cand = re.split(r'\s+(?:Dept|Dep|Department|Fac|Faculty|HOD|Incharge|Prof|of|from)\b', cand, flags=re.IGNORECASE)[0].strip()
+                    cand = re.sub(r'^(?:Dr|Prof|Mr|Ms|Mrs)\.?\s*', '', cand, flags=re.IGNORECASE).strip()
+                    bad_words = ["institute", "college", "university", "department", "mr.", "ms.", "mrs.", "dr.", "dr./", "five day", "faculty development"]
+                    if cand and not any(b == cand.lower() or b in cand.lower() for b in bad_words) and len(cand) > 2:
+                        result["FACULTY NAME"] = cand
+                        break
+
         # ==============================================================
         # 4. FDP / PROGRAM NAME
         # ==============================================================
         if not result["FDP / PROGRAM NAME"]:
+            # Pattern A: Quoted title: e.g. "Hands on Generative AI...", "Adaptive Learning..."
+            m = re.search(r'["\u201c]([^"\u201d\r\n]{5,120})["\u201d]\s*,?\s*(?:from|conducted|organized)?', flat)
+            if m:
+                cand = m.group(1).strip(" -\"'")
+                if len(cand) > 6 and not re.search(r'certificate|appreciation|participation', cand, re.IGNORECASE):
+                    result["FDP / PROGRAM NAME"] = cand
+
+        if not result["FDP / PROGRAM NAME"]:
+            # Pattern B: Faculty Development Programme on X / Programme on X
             m = re.search(
-                r'(?:Program|Programme|FDP|Workshop|STTP)\s+on\s+'
-                r'["\-]?\s*([^"\-\n]{5,120}?)\s*["\-]?\s+'
-                r'organized by',
+                r'(?:Faculty Development Programme on|Faculty Development Program on|Programme on|Program on|FDP on|Workshop on|STTP on)\s*(?:[A-Z0-9\-]+\s+)?["\-]?\s*([^"\n\r,]{5,100})',
                 flat, re.IGNORECASE
             )
             if m:
-                result["FDP / PROGRAM NAME"] = m.group(1).strip(" -\"'")
+                cand = m.group(1).strip(" -\"'")
+                cand = re.split(r'\s*(?:organized|conducted|from|held|during|\d{4}|January|February|March|April|May|June|July|August|September|October|November|December)\b', cand, flags=re.IGNORECASE)[0].strip()
+                if len(cand) > 4:
+                    result["FDP / PROGRAM NAME"] = cand
+
+        if not result["FDP / PROGRAM NAME"]:
+            # Pattern C: Title right before closing quote and from/conducted/organized (e.g. OCR missed opening quote)
+            m = re.search(r'([A-Za-z0-9\s:]{8,100})["\u201d]\s*,?\s*(?:from|conducted|organized)', flat)
+            if m:
+                cand = m.group(1).strip(" -\"'")
+                cand = re.split(r'\s+(?:Dept|Dep|CSERIT|RIT|MSRIT)\s+', cand, flags=re.IGNORECASE)[-1].strip()
+                if len(cand) > 6 and not re.search(r'certificate|appreciation|participation', cand, re.IGNORECASE):
+                    result["FDP / PROGRAM NAME"] = cand
 
         if not result["FDP / PROGRAM NAME"]:
             m = re.search(
-                r'(?:Faculty Development Programme on|Faculty Development Program on'
-                r'|FDP on|Workshop on|STTP on)\s*["\-]?\s*([^"\n]{5,120})',
+                r'(?:Two-weeks|One-Week|One Week|Two Weeks|Five Days?|5-Day)?\s*Faculty Development Prog[a-z]*(?:\s+on)?\s*["\-]?\s*([^"\n\r,]{5,100})',
                 flat, re.IGNORECASE
             )
             if m:
-                title = m.group(1).strip(" -\"'")
-                title = re.split(r'\s*(?:organized by|conducted by|July|August|from \d)', title, flags=re.IGNORECASE)[0]
-                result["FDP / PROGRAM NAME"] = title.strip()
-
-        if not result["FDP / PROGRAM NAME"]:
-            m = re.search(
-                r'(?:Two-weeks|One-Week|One Week|Two Weeks|Five Days?|5-Day)\s+'
-                r'Faculty Development Prog[a-z]*\s+on\s+["\-]?\s*([^"\n]{5,120})',
-                flat, re.IGNORECASE
-            )
-            if m:
-                result["FDP / PROGRAM NAME"] = m.group(1).strip(" -\"'")
+                cand = m.group(1).strip(" -\"'")
+                cand = re.split(r'\s*(?:organized|conducted|from|held|during|\d{4}|January|February|March|April|May|June|July|August|September|October|November|December)\b', cand, flags=re.IGNORECASE)[0].strip()
+                if len(cand) > 4:
+                    result["FDP / PROGRAM NAME"] = cand
 
         # ==============================================================
         # 5. PROGRAM INSTITUTION
         # ==============================================================
         if not result["PROGRAM INSTITUTION"]:
             m = re.search(
-                r'organized by\s+([^,\.]{4,80}(?:NIT|BITS|IIT|IIIT|College|Institute'
-                r'|University|Academy|TCS|SwipeGen|RVITM)[^,\.]*)',
+                r'(?:organized|conducted)\s+by\s+([^,\.]{4,100}(?:NIT|BITS|IIT|IIIT|College|Institute|University|Academy|TCS|SwipeGen|RVITM)[^,\.]*)',
                 flat, re.IGNORECASE
             )
             if m:
                 raw_org = m.group(1).strip()
                 inst_tok = re.search(
-                    r'(NIT[\s,]+[A-Za-z]+|BITS Pilani[\w\s]*|IIT[\s,]+[A-Za-z]+'
-                    r'|IIIT[\s,]+[A-Za-z]+|BMS College of Engineering'
-                    r'|Ramaiah Institute of Technology|MSRIT|RIT)',
+                    r'(NIT[\s,]+[A-Za-z]+|BITS Pilani[\w\s]*|IIT[\s,]+[A-Za-z]+|IIIT[\s,]+[A-Za-z]+|BMS College of Engineering|Ramaiah Institute of Technology|MSRIT|RIT|Electronics and ICT Academy[\w\s,]*)',
                     raw_org, re.IGNORECASE
                 )
                 result["PROGRAM INSTITUTION"] = normalize_institution(
@@ -322,6 +466,7 @@ class CertificateOCRProcessor:
 
         if not result["PROGRAM INSTITUTION"]:
             for pat in [
+                r'\b(Electronics and ICT Academy[\w\s,]*)\b',
                 r'\b(NIT[\s,]+[A-Za-z]+|National Institute of Technology[\s,]+[A-Za-z]+)\b',
                 r'\b(BITS Pilani[\w\s]*|IIT[\s,]+[A-Za-z]+|IIIT[\s,]+[A-Za-z]+|BMS College of Engineering)\b',
                 r'\b(Ramaiah Institute of Technology|MSRIT|RIT|M\.S\.\s*Ramaiah Institute of Technology)\b',
@@ -335,9 +480,12 @@ class CertificateOCRProcessor:
         # 6. CERTIFICATE ID
         # ==============================================================
         if not result["CERTIFICATE ID"]:
-            m = re.search(r'\b(CERT[-\s]?\d{3,4})\b', flat, re.IGNORECASE)
+            # Multilevel alphanumeric IDs like MNITJ/APSCHE/QCOMP/48688/2025 or EICT/NITP/61/25-26/3776
+            m = re.search(r'\b([A-Z0-9]{3,10}(?:\/[A-Z0-9_\-]+){2,6})\b', flat)
             if m:
                 result["CERTIFICATE ID"] = m.group(1).strip()
+            elif re.search(r'\b(CERT[-\s]?\d{3,4})\b', flat, re.IGNORECASE):
+                result["CERTIFICATE ID"] = re.search(r'\b(CERT[-\s]?\d{3,4})\b', flat, re.IGNORECASE).group(1).strip()
             else:
                 m = re.search(r'Ref\.?\s*No[:.]\s*([A-Za-z0-9\/\-]+)', flat)
                 if m:
