@@ -1,0 +1,265 @@
+{
+  "best_model_name": "RandomForest",
+  "feature_columns": [
+    "is_internal",
+    "duration_days",
+    "claimed_days",
+    "timeline_match",
+    "faculty_matched",
+    "cert_details_completeness",
+    "ood_count",
+    "present_count",
+    "holiday_count",
+    "casual_leave_count",
+    "emergency_leave_count",
+    "unpaid_leave_count",
+    "vacation_count",
+    "conflict_days_count",
+    "missing_days_count",
+    "is_month_missing",
+    "attendance_coverage"
+  ],
+  "classes": [
+    "INVALID",
+    "NEEDS REVIEW",
+    "VALID"
+  ],
+  "metrics": {
+    "RandomForest": {
+      "accuracy": 1.0,
+      "f1_score": 1.0,
+      "confusion_matrix": [
+        [
+          38,
+          0,
+          0
+        ],
+        [
+          0,
+          19,
+          0
+        ],
+        [
+          0,
+          0,
+          45
+        ]
+      ],
+      "classes": [
+        "INVALID",
+        "NEEDS REVIEW",
+        "VALID"
+      ],
+      "report": {
+        "INVALID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 38.0
+        },
+        "NEEDS REVIEW": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 19.0
+        },
+        "VALID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 45.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 102.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 102.0
+        }
+      }
+    },
+    "GradientBoosting": {
+      "accuracy": 1.0,
+      "f1_score": 1.0,
+      "confusion_matrix": [
+        [
+          38,
+          0,
+          0
+        ],
+        [
+          0,
+          19,
+          0
+        ],
+        [
+          0,
+          0,
+          45
+        ]
+      ],
+      "classes": [
+        "INVALID",
+        "NEEDS REVIEW",
+        "VALID"
+      ],
+      "report": {
+        "INVALID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 38.0
+        },
+        "NEEDS REVIEW": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 19.0
+        },
+        "VALID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 45.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 102.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 102.0
+        }
+      }
+    },
+    "DecisionTree": {
+      "accuracy": 1.0,
+      "f1_score": 1.0,
+      "confusion_matrix": [
+        [
+          38,
+          0,
+          0
+        ],
+        [
+          0,
+          19,
+          0
+        ],
+        [
+          0,
+          0,
+          45
+        ]
+      ],
+      "classes": [
+        "INVALID",
+        "NEEDS REVIEW",
+        "VALID"
+      ],
+      "report": {
+        "INVALID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 38.0
+        },
+        "NEEDS REVIEW": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 19.0
+        },
+        "VALID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 45.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 102.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 102.0
+        }
+      }
+    },
+    "LogisticRegression": {
+      "accuracy": 1.0,
+      "f1_score": 1.0,
+      "confusion_matrix": [
+        [
+          38,
+          0,
+          0
+        ],
+        [
+          0,
+          19,
+          0
+        ],
+        [
+          0,
+          0,
+          45
+        ]
+      ],
+      "classes": [
+        "INVALID",
+        "NEEDS REVIEW",
+        "VALID"
+      ],
+      "report": {
+        "INVALID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 38.0
+        },
+        "NEEDS REVIEW": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 19.0
+        },
+        "VALID": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 45.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 102.0
+        },
+        "weighted avg": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 102.0
+        }
+      }
+    }
+  }
+}
