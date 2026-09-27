@@ -40,13 +40,47 @@ class CertificateProcessor:
 
         # OCR / Text extraction
         raw_text = self.ocr_processor.extract_raw_text(saved_path, filename)
-        
-        # Parse fields
-        parsed = self.ocr_processor.parse_certificate_text(raw_text, fallback_meta=fallback_meta)
+        is_image_pdf = not raw_text.strip()
+
+        # Faculty lookup map for text-scan fallback {fid: official_name}
+        faculty_master_map = dict(self.data_loader.faculty_by_id) if self.data_loader.faculty_by_id else {}
+
+        # Parse fields from OCR text
+        parsed = self.ocr_processor.parse_certificate_text(
+            raw_text, fallback_meta=fallback_meta, faculty_master=faculty_master_map
+        )
         parsed['SAVED_FILE_PATH'] = saved_path
         parsed['FILENAME'] = filename
+        parsed['IS_IMAGE_PDF'] = is_image_pdf
 
-        # Faculty Matching
+        # ---------------------------------------------------------------
+        # FILENAME-BASED FACULTY EXTRACTION (fallback for image-based PDFs or bad OCR)
+        # Tries multiple segments: "Dr. X" part, part before "_", part after " - "
+        # e.g. "DBM FDP 2026_3 - Dr. Devaraju B M.pdf" → "Dr. Devaraju B M"
+        # e.g. "Dr. Shilpa Shashikant Chaudhari_48688 - Shilpa Chaudari.pdf" → "Dr. Shilpa..."
+        # ---------------------------------------------------------------
+        if not parsed.get("FACULTY NAME") or not parsed.get("FACULTY ID"):
+            stem = filename.rsplit('.', 1)[0]
+            # Build candidate list from various filename splits
+            candidates = []
+            if ' - ' in stem:
+                candidates.append(stem.split(' - ')[-1].strip())  # part after last " - "
+                candidates.append(stem.split(' - ')[0].strip())   # part before first " - "
+            candidates.append(stem.split('_')[0].strip())         # part before first "_"
+            candidates.append(stem.strip())                        # whole stem
+
+            for cand in candidates:
+                if cand and len(cand) > 4:
+                    match = self.data_loader.find_faculty(faculty_name=cand)
+                    if match:
+                        if not parsed.get("FACULTY NAME"):
+                            parsed["FACULTY NAME"] = match[1]
+                        if not parsed.get("FACULTY ID"):
+                            parsed["FACULTY ID"] = match[0]
+                        break
+
+
+        # Faculty Matching against Master
         raw_fid = parsed.get("FACULTY ID", "").strip()
         raw_fname = parsed.get("FACULTY NAME", "").strip()
 
@@ -57,6 +91,7 @@ class CertificateProcessor:
             parsed['FACULTY_MATCHED'] = True
         else:
             parsed['FACULTY_MATCHED'] = False
+
 
         # Normalize Institution and Internal/External classification
         inst = parsed.get("PROGRAM INSTITUTION", "").strip()

@@ -89,8 +89,12 @@ class DataLoader:
 
     def find_faculty(self, faculty_id: Optional[str] = None, faculty_name: Optional[str] = None) -> Optional[Tuple[str, str]]:
         """
-        First attempt: Faculty ID -> Faculty Master.
-        If Faculty ID is unavailable: Match by Faculty Name.
+        Attempts to match a faculty via ID then by name.
+        Multi-stage name matching:
+          1. Exact normalised key
+          2. Case-insensitive exact
+          3. Partial substring containment (>=5 chars)
+          4. Token overlap (>=2 significant tokens match)
         Returns (Faculty ID, Faculty Name) or None.
         """
         if faculty_id:
@@ -101,19 +105,64 @@ class DataLoader:
         if faculty_name:
             fname_clean = faculty_name.strip()
             norm_key = self._normalize_name_key(fname_clean)
+
+            # Stage 1: exact normalised key
             if norm_key in self.faculty_by_name:
                 return self.faculty_by_name[norm_key]
-            
-            # Case insensitive exact lookup
+
+            # Stage 2: case-insensitive exact
             if fname_clean.lower() in self.faculty_by_name:
                 return self.faculty_by_name[fname_clean.lower()]
 
-            # Partial match with high confidence (e.g. Dr. Sushma B vs Sushma B)
+            # Stage 3: substring containment (handles abbreviated names)
             for key, (fid, official_name) in self.faculty_by_name.items():
-                if norm_key and (norm_key == key or (len(norm_key) >= 5 and norm_key in key) or (len(key) >= 5 and key in norm_key)):
-                    return (fid, official_name)
+                if norm_key and len(norm_key) >= 5:
+                    if norm_key in key or (len(key) >= 5 and key in norm_key):
+                        return (fid, official_name)
+
+            # Stage 4: token overlap (handles "Shilpa Chaudari" → "Shilpa Shashikant Chaudhari")
+            input_tokens = set(
+                t for t in re.sub(r'[^a-z ]', '', fname_clean.lower()).split()
+                if len(t) >= 3
+            )
+            if len(input_tokens) >= 1:
+                best_match = None
+                best_score = 0
+                for key, (fid, official_name) in self.faculty_by_name.items():
+                    master_tokens = set(
+                        t for t in re.sub(r'[^a-z ]', '', official_name.lower()).split()
+                        if len(t) >= 3
+                    )
+                    overlap = len(input_tokens & master_tokens)
+                    # Require at least 2 token matches, or 1 if the token is long (>=6 chars)
+                    long_overlap = len([t for t in (input_tokens & master_tokens) if len(t) >= 6])
+                    if overlap >= 2 or long_overlap >= 1:
+                        score = overlap + long_overlap
+                        if score > best_score:
+                            best_score = score
+                            best_match = (fid, official_name)
+                if best_match:
+                    return best_match
+
+            # Stage 5: Fuzzy character matching (handles OCR character/spacing glitches e.g. "Aks habhaKamath" → "Akshatha Kamath")
+            import difflib
+            best_fuzzy_match = None
+            best_fuzzy_ratio = 0.0
+            norm_input = re.sub(r'[^a-z]', '', fname_clean.lower())
+            norm_input = re.sub(r'^(dr|prof|mr|ms|mrs)', '', norm_input)
+            if len(norm_input) >= 4:
+                for key, (fid, official_name) in self.faculty_by_name.items():
+                    norm_target = re.sub(r'[^a-z]', '', official_name.lower())
+                    norm_target = re.sub(r'^(dr|prof|mr|ms|mrs)', '', norm_target)
+                    ratio = difflib.SequenceMatcher(None, norm_input, norm_target).ratio()
+                    if ratio >= 0.70 and ratio > best_fuzzy_ratio:
+                        best_fuzzy_ratio = ratio
+                        best_fuzzy_match = (fid, official_name)
+                if best_fuzzy_match:
+                    return best_fuzzy_match
 
         return None
+
 
     def get_attendance(self, faculty_id: str, date_str: str) -> Optional[str]:
         """
