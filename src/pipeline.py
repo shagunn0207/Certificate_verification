@@ -1,0 +1,127 @@
+import os
+from typing import Dict, Any, Optional
+from src.data_loader import DataLoader
+from src.certificate_processing import CertificateProcessor
+from src.verification import RuleVerificationEngine
+from src.feature_engineering import FeatureEngineer
+from src.ml_model import MLVerificationModel
+from src.history import VerificationHistoryManager
+
+class VerificationPipeline:
+    def __init__(self, data_dir: Optional[str] = None):
+        self.data_loader = DataLoader(data_dir=data_dir)
+        self.cert_processor = CertificateProcessor(self.data_loader)
+        self.rule_engine = RuleVerificationEngine(self.data_loader)
+        self.feature_engineer = FeatureEngineer()
+        self.ml_model = MLVerificationModel()
+        self.history_manager = VerificationHistoryManager()
+
+    def verify_uploaded_certificate(
+        self,
+        file_bytes: bytes,
+        filename: str,
+        fallback_meta: Optional[Dict[str, Any]] = None,
+        save_to_history: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Executes end-to-end verification for an uploaded file:
+        File -> OCR -> Extraction -> Faculty Match -> Attendance Lookup ->
+        Rule Engine -> Feature Engineering -> ML Model -> Hybrid Result -> Audit History.
+        """
+        # 1 & 2. Process File & OCR
+        cert_data = self.cert_processor.process_uploaded_file(
+            file_bytes=file_bytes,
+            filename=filename,
+            fallback_meta=fallback_meta
+        )
+
+        return self._execute_core_pipeline(cert_data, save_to_history=save_to_history)
+
+    def verify_existing_certificate(
+        self,
+        tracker_row: Dict[str, Any],
+        save_to_history: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Executes end-to-end verification for a certificate from certificate_tracker.csv.
+        """
+        cert_data = self.cert_processor.process_existing_record(tracker_row)
+        return self._execute_core_pipeline(cert_data, save_to_history=save_to_history)
+
+    def _execute_core_pipeline(self, cert_data: Dict[str, Any], save_to_history: bool = True) -> Dict[str, Any]:
+        """
+        Core verification logic combining Rule Engine and Machine Learning.
+        """
+        # 1. Rule Engine Verification
+        rule_output = self.rule_engine.verify(cert_data)
+
+        # 2. Feature Engineering
+        features = self.feature_engineer.extract_features(cert_data, rule_output)
+
+        # 3. Machine Learning Prediction
+        ml_output = self.ml_model.predict(features)
+
+        # 4. Hybrid Consensus & Final Result Formulation
+        rule_result = rule_output["RULE_RESULT"]
+        rule_reason = rule_output["RULE_REASON"]
+        ml_pred = ml_output["prediction"]
+
+        # Deterministic rules guarantee integrity:
+        # A. Attendance conflicts / timeline mismatches CANNOT be silently overridden by ML
+        if rule_result == "INVALID":
+            final_result = "INVALID"
+            final_reason = rule_reason
+
+        # B. Missing attendance evidence / unmatched faculty MUST trigger human review
+        elif rule_result == "NEEDS REVIEW":
+            final_result = "NEEDS REVIEW"
+            final_reason = rule_reason
+
+        # C. Rule Engine verified valid
+        elif rule_result == "VALID":
+            if ml_pred == "VALID":
+                final_result = "VALID"
+                final_reason = rule_reason
+            else:
+                # ML detected anomaly in duration, pattern, or completeness
+                final_result = "NEEDS REVIEW"
+                final_reason = f"Attendance records match OOD/Present status, but ML model flagged anomaly (ML: {ml_pred} with {ml_output['confidence']*100:.1f}% confidence). Human review recommended."
+        else:
+            final_result = rule_result
+            final_reason = rule_reason
+
+        response = {
+            "cert_data": cert_data,
+            "rule_output": rule_output,
+            "ml_output": ml_output,
+            "features": features,
+            "final_result": final_result,
+            "final_reason": final_reason
+        }
+
+        # 5. Save verification history and update tracker if applicable
+        if save_to_history:
+            history_record = self.history_manager.record_verification(
+                cert_data=cert_data,
+                rule_output=rule_output,
+                ml_output=ml_output,
+                final_result=final_result,
+                final_reason=final_reason
+            )
+            response["history_record"] = history_record
+
+            # Update tracker if certificate ID exists
+            cid = cert_data.get("CERTIFICATE ID")
+            if cid:
+                attendance_summary = ", ".join([f"{r['date']}: {r['status']}" for r in rule_output.get("DAILY_ATTENDANCE", [])])
+                self.data_loader.update_certificate_tracker_row(
+                    cert_id=cid,
+                    updates={
+                        "ATTENDANCE STATUS": attendance_summary or "CHECKED",
+                        "TIMELINE MATCH": rule_output.get("TIMELINE_MATCH", "N/A"),
+                        "VERIFICATION RESULT": final_result,
+                        "VERIFICATION REASON": final_reason
+                    }
+                )
+
+        return response
