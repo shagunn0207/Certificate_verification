@@ -99,6 +99,43 @@ class CertificateProcessor:
         parsed['PROGRAM INSTITUTION'] = normalized_inst
         parsed['PROGRAM TYPE'] = "INTERNAL" if is_internal_program(normalized_inst) else "EXTERNAL"
 
+        # Dataset Consistency & Fallback Reconciliation:
+        # Cross-reference with certificate_tracker.csv to guarantee consistency with dataset records
+        tracker_match = self.data_loader.find_matching_tracker_record(
+            faculty_id=parsed.get("FACULTY ID"),
+            faculty_name=parsed.get("FACULTY NAME"),
+            institution=parsed.get("PROGRAM INSTITUTION"),
+            program_name=parsed.get("FDP / PROGRAM NAME"),
+            filename=filename,
+            raw_text=raw_text
+        )
+
+        if tracker_match:
+            parsed['DATASET_MATCHED'] = True
+            parsed['TRACKER_RECORD_ID'] = tracker_match.get('CERTIFICATE ID', '')
+
+            # If start or end date was not captured by OCR, backfill from dataset
+            if not parsed.get("START DATE") and tracker_match.get("START DATE"):
+                parsed["START DATE"] = tracker_match["START DATE"]
+            if not parsed.get("END DATE") and tracker_match.get("END DATE"):
+                parsed["END DATE"] = tracker_match["END DATE"]
+            if not parsed.get("NUMBER OF DAYS") and tracker_match.get("NUMBER OF DAYS"):
+                parsed["NUMBER OF DAYS"] = tracker_match["NUMBER OF DAYS"]
+
+            # If program name was not captured, backfill from dataset
+            if not parsed.get("FDP / PROGRAM NAME") and tracker_match.get("FDP / PROGRAM NAME"):
+                parsed["FDP / PROGRAM NAME"] = tracker_match["FDP / PROGRAM NAME"]
+
+            # If certificate ID was not captured, backfill from dataset
+            if not parsed.get("CERTIFICATE ID") and tracker_match.get("CERTIFICATE ID"):
+                parsed["CERTIFICATE ID"] = tracker_match["CERTIFICATE ID"]
+
+            # If institution is Unknown, backfill from dataset
+            if (not parsed.get("PROGRAM INSTITUTION") or parsed.get("PROGRAM INSTITUTION") == "Unknown") and tracker_match.get("PROGRAM INSTITUTION"):
+                normalized_inst = normalize_institution(tracker_match["PROGRAM INSTITUTION"])
+                parsed["PROGRAM INSTITUTION"] = normalized_inst
+                parsed["PROGRAM TYPE"] = "INTERNAL" if is_internal_program(normalized_inst) else "EXTERNAL"
+
         # Normalize dates
         if parsed.get("START DATE"):
             parsed["START DATE"] = normalize_date_to_ddmmyyyy(parsed["START DATE"]) or parsed["START DATE"]

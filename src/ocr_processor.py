@@ -207,6 +207,26 @@ class CertificateOCRProcessor:
         flat = re.sub(r'(\d+)h(\s)', r'\1\2', flat)       # "6h " → "6 "
         flat = re.sub(r'(\d+)h(-)', r'\1\2', flat)        # "6h-" → "6-"
 
+        # OCR month misread correction: common OCR character confusions in month names
+        month_ocr_fixes = [
+            (r'\bFune\b', 'June'),
+            (r'\bIune\b', 'June'),
+            (r'\bTuly\b', 'July'),
+            (r'\bIuly\b', 'July'),
+            (r'\bTanuary\b', 'January'),
+            (r'\bIanuary\b', 'January'),
+            (r'\b0ctober\b', 'October'),
+            (r'\b0ct\b', 'Oct'),
+            (r'\bAupust\b', 'August'),
+            (r'\bAuqust\b', 'August'),
+            (r'\bFehruary\b', 'February'),
+            (r'\bSeptemher\b', 'September'),
+            (r'\bNovemher\b', 'November'),
+            (r'\bDecemher\b', 'December'),
+        ]
+        for pat, repl in month_ocr_fixes:
+            flat = re.sub(pat, repl, flat, flags=re.IGNORECASE)
+
         # ==============================================================
         # 1. FACULTY ID
         # ==============================================================
@@ -221,9 +241,9 @@ class CertificateOCRProcessor:
         found_start, found_end = result["START DATE"], result["END DATE"]
 
         if not found_start or not found_end:
-            # Pattern 0 (HIGHEST PRIORITY): "Month D1 - D2, YYYY"  e.g. "July 14 - 25, 2025"
+            # Pattern 0 (HIGHEST PRIORITY): "Month D1 - D2, YYYY" or "from Month D1 to D2, YYYY"  e.g. "from June 16 to 19, 2026", "July 14 - 25, 2025"
             m = re.search(
-                r'([A-Za-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?\s*(?:-|–|to)\s*(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{4})',
+                r'(?:from|dated)?\s*([A-Za-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?\s*(?:-|–|to)\s*(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{4})',
                 flat, re.IGNORECASE
             )
             if m:
@@ -445,6 +465,14 @@ class CertificateOCRProcessor:
                 cand = re.split(r'\s*(?:organized|conducted|from|held|during|\d{4}|January|February|March|April|May|June|July|August|September|October|November|December)\b', cand, flags=re.IGNORECASE)[0].strip()
                 if len(cand) > 4:
                     result["FDP / PROGRAM NAME"] = cand
+
+        if not result["FDP / PROGRAM NAME"]:
+            # Pattern D: Standalone uppercase/block program titles (e.g. FEAI \n FOUNDATIONS OF ETHICAL AI)
+            m = re.search(r'\b(?:FEAI|FDP|PROGRAMME|WORKSHOP)\s*\n?\s*([A-Z\s]{6,80})\b', text)
+            if m:
+                cand = m.group(1).strip()
+                if not any(w in cand.lower() for w in ['certificate', 'participation', 'technology', 'hyderabad', 'ramaiah']):
+                    result["FDP / PROGRAM NAME"] = cand.title()
 
         # ==============================================================
         # 5. PROGRAM INSTITUTION

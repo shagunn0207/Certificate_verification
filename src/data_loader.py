@@ -188,6 +188,100 @@ class DataLoader:
         with open(self.tracker_file, mode='r', encoding='utf-8') as f:
             return list(csv.DictReader(f))
 
+    def find_matching_tracker_record(
+        self,
+        faculty_id: Optional[str] = None,
+        faculty_name: Optional[str] = None,
+        institution: Optional[str] = None,
+        program_name: Optional[str] = None,
+        filename: Optional[str] = None,
+        raw_text: Optional[str] = None
+    ) -> Optional[Dict[str, str]]:
+        """
+        Cross-references an uploaded certificate against certificate_tracker.csv
+        to ensure consistency with the institutional dataset.
+        Matches candidate records for the faculty member using institution,
+        program keywords, dates, and filename tokens.
+        """
+        tracker_rows = self.get_certificate_tracker_rows()
+        if not tracker_rows:
+            return None
+
+        # 1. Filter candidate rows by faculty
+        candidates = []
+        fid_clean = (faculty_id or "").strip().upper()
+        fname_clean = (faculty_name or "").strip().lower()
+
+        for r in tracker_rows:
+            row_fid = r.get("FACULTY ID", "").strip().upper()
+            row_fname = r.get("FACULTY NAME", "").strip().lower()
+            if fid_clean and row_fid == fid_clean:
+                candidates.append(r)
+            elif fname_clean and (fname_clean in row_fname or row_fname in fname_clean):
+                candidates.append(r)
+
+        if not candidates:
+            candidates = tracker_rows
+
+        if len(candidates) == 1 and fid_clean and candidates[0].get("FACULTY ID") == fid_clean:
+            return candidates[0]
+
+        # 2. Score candidates by filename, institution, program title, and text
+        best_row = None
+        best_score = 0
+
+        filename_lower = (filename or "").lower()
+        inst_lower = (institution or "").lower()
+        prog_lower = (program_name or "").lower()
+        text_lower = (raw_text or "").lower()
+
+        for row in candidates:
+            score = 0
+            row_inst = row.get("PROGRAM INSTITUTION", "").lower()
+            row_prog = row.get("FDP / PROGRAM NAME", "").lower()
+            row_cid = row.get("CERTIFICATE ID", "").lower()
+
+            # Filename keywords
+            if row_cid and row_cid in filename_lower:
+                score += 10
+            for kw in re.findall(r'[a-z0-9]{3,}', row_prog):
+                if kw in ['and', 'for', 'the', 'with', 'course', 'program', 'programme', 'development']:
+                    continue
+                if kw in filename_lower:
+                    score += 3
+                if kw in text_lower:
+                    score += 2
+
+            # Institution keywords (e.g. iiit, bms, nit, rit, msrit, tcs)
+            for kw in re.findall(r'[a-z0-9]{3,}', row_inst):
+                if kw in ['and', 'the', 'for', 'institute', 'technology', 'college', 'engineering']:
+                    continue
+                if kw in inst_lower or kw in filename_lower:
+                    score += 4
+                if kw in text_lower:
+                    score += 2
+
+            # Exact or partial institution match
+            if inst_lower and inst_lower != "unknown" and (inst_lower in row_inst or row_inst in inst_lower):
+                score += 5
+
+            # Dates in raw text
+            s_date = row.get("START DATE", "")
+            e_date = row.get("END DATE", "")
+            if s_date and s_date in text_lower:
+                score += 5
+            if e_date and e_date in text_lower:
+                score += 5
+
+            if score > best_score:
+                best_score = score
+                best_row = row
+
+        if best_row and best_score >= 3:
+            return best_row
+
+        return None
+
     def update_certificate_tracker_row(self, cert_id: str, updates: Dict[str, str]) -> bool:
         """
         Updates a specific certificate in certificate_tracker.csv.
