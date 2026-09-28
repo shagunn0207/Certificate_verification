@@ -14,8 +14,9 @@ INTERNAL_ALIASES = {
 
 def normalize_institution(inst_str: str) -> str:
     """
-    Normalize institution name aliases for Ramaiah Institute of Technology.
-    Known aliases: MSRIT, RIT, M.S. Ramaiah Institute of Technology,
+    Normalize institution name aliases for Ramaiah Institute of Technology
+    and external partner institutions like RVITM.
+    Known internal aliases: MSRIT, RIT, M.S. Ramaiah Institute of Technology,
     MSRIT Bangalore, etc.
     Does NOT merge genuinely different Ramaiah institutions such as
     Ramaiah University of Applied Sciences or Ramaiah Institute of Management.
@@ -25,7 +26,13 @@ def normalize_institution(inst_str: str) -> str:
     
     clean_str = inst_str.strip()
     normalized = clean_str.upper().replace('.', '').strip()
-    condensed = normalized.replace(' ', '').replace('-', '').replace(',', '')
+    condensed = normalized.replace(' ', '').replace('-', '').replace(',', '').replace('&', 'AND')
+
+    # RVITM / RV Institute of Technology and Management normalization
+    if condensed in {"RVITM", "RVINSTITUTEOFTECHNOLOGYANDMANAGEMENT", "RVINSTITUTEOFTECHNOLOGYMANAGEMENT", "RVINSTITUTEOFTECHNOLOGY"}:
+        return "RVITM"
+    if "RV INSTITUTE OF TECHNOLOGY" in normalized or "RVITM" in normalized:
+        return "RVITM"
 
     if condensed in INTERNAL_ALIASES:
         return "Ramaiah Institute of Technology"

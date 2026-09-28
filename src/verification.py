@@ -122,8 +122,16 @@ class RuleVerificationEngine:
                 result["ATTENDANCE_COVERAGE"] = 0.0
                 return result
 
-        # 5. Daily Attendance Verification across all dates
-        is_internal = cert_data.get("PROGRAM TYPE", "EXTERNAL").upper() == "INTERNAL"
+        # 5. Institution and Daily Attendance Verification across all dates
+        inst = cert_data.get("PROGRAM INSTITUTION", "").strip()
+        prog_type = cert_data.get("PROGRAM TYPE", "").strip().upper()
+
+        if inst.lower() in ["unknown", ""] or prog_type not in ["INTERNAL", "EXTERNAL"]:
+            result["RULE_RESULT"] = "NEEDS REVIEW"
+            result["RULE_REASON"] = "Program institution is ambiguous or unknown. Human review required to determine Internal/External classification."
+            return result
+
+        is_internal = prog_type == "INTERNAL"
         supporting_set = SUPPORTING_STATUSES_INTERNAL if is_internal else SUPPORTING_STATUSES_EXTERNAL
 
         daily_records = []

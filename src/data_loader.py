@@ -3,7 +3,7 @@ import csv
 import re
 from typing import Dict, List, Optional, Tuple, Set
 from collections import defaultdict
-from src.utils import extract_month_year
+from src.utils import extract_month_year, normalize_date_to_ddmmyyyy, normalize_institution
 
 class DataLoader:
     def __init__(self, data_dir: Optional[str] = None):
@@ -196,7 +196,9 @@ class DataLoader:
         program_name: Optional[str] = None,
         filename: Optional[str] = None,
         raw_text: Optional[str] = None,
-        cert_id: Optional[str] = None
+        cert_id: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None
     ) -> Optional[Dict[str, str]]:
         """
         Cross-references an uploaded certificate against certificate_tracker.csv
@@ -205,7 +207,7 @@ class DataLoader:
         Priority order:
         1. Exact Certificate ID match (from explicit ID, filename, or raw OCR)
         2. Google Drive file ID match (from certificate link vs filename / text)
-        3. Faculty candidate filtering + keyword scoring (program, institution, dates)
+        3. Faculty candidate filtering + keyword & date scoring (program, institution, dates)
         """
         tracker_rows = self.get_certificate_tracker_rows()
         if not tracker_rows:
@@ -262,29 +264,46 @@ class DataLoader:
         if len(candidates) == 1 and fid_clean and candidates[0].get("FACULTY ID") == fid_clean:
             return candidates[0]
 
-        # 4. Score candidates by filename, institution, program title, and text
+        # 4. Score candidates by filename, institution, program title, dates, and text
         best_row = None
         best_score = 0
 
         inst_lower = (institution or "").lower()
         prog_lower = (program_name or "").lower()
+        norm_input_inst = normalize_institution(institution or "")
+        norm_start = normalize_date_to_ddmmyyyy(start_date or "") if start_date else None
+        norm_end = normalize_date_to_ddmmyyyy(end_date or "") if end_date else None
+
+        stop_words = {'and', 'for', 'the', 'with', 'course', 'program', 'programme', 'development', 'fdp', 'workshop', 'sttp', 'bootcamp', 'training', 'hands', 'learning', 'national', 'international'}
+        input_prog_tokens = set(re.findall(r'[a-z0-9]{3,}', prog_lower)) - stop_words
 
         for row in candidates:
             score = 0
             row_inst = row.get("PROGRAM INSTITUTION", "").lower()
             row_prog = row.get("FDP / PROGRAM NAME", "").lower()
             row_cid = row.get("CERTIFICATE ID", "").lower()
+            row_norm_inst = normalize_institution(row.get("PROGRAM INSTITUTION", ""))
 
+            # A. Explicit Certificate ID in filename or text
             if row_cid and (row_cid in filename_lower or row_cid in text_lower):
-                score += 15
+                score += 20
 
-            for kw in re.findall(r'[a-z0-9]{3,}', row_prog):
-                if kw in ['and', 'for', 'the', 'with', 'course', 'program', 'programme', 'development']:
-                    continue
+            # B. Program Title Keyword Overlap
+            row_prog_tokens = set(re.findall(r'[a-z0-9]{3,}', row_prog)) - stop_words
+            overlap = len(input_prog_tokens & row_prog_tokens)
+            score += overlap * 4
+
+            for kw in row_prog_tokens:
                 if kw in filename_lower:
                     score += 3
                 if kw in text_lower:
                     score += 2
+
+            # C. Institution Matching (normalized + keyword)
+            if norm_input_inst and norm_input_inst != "Unknown" and norm_input_inst == row_norm_inst:
+                score += 10
+            elif inst_lower and inst_lower != "unknown" and (inst_lower in row_inst or row_inst in inst_lower):
+                score += 6
 
             for kw in re.findall(r'[a-z0-9]{3,}', row_inst):
                 if kw in ['and', 'the', 'for', 'institute', 'technology', 'college', 'engineering']:
@@ -293,15 +312,21 @@ class DataLoader:
                     score += 4
                 if kw in text_lower:
                     score += 2
+                if kw in prog_lower:
+                    score += 4
 
-            if inst_lower and inst_lower != "unknown" and (inst_lower in row_inst or row_inst in inst_lower):
+            # D. Dates Matching (High Reliability!)
+            row_s_date = normalize_date_to_ddmmyyyy(row.get("START DATE", "")) or row.get("START DATE", "")
+            row_e_date = normalize_date_to_ddmmyyyy(row.get("END DATE", "")) or row.get("END DATE", "")
+
+            if norm_start and norm_start == row_s_date:
+                score += 12
+            elif row_s_date and row_s_date in text_lower:
                 score += 5
 
-            s_date = row.get("START DATE", "")
-            e_date = row.get("END DATE", "")
-            if s_date and s_date in text_lower:
-                score += 5
-            if e_date and e_date in text_lower:
+            if norm_end and norm_end == row_e_date:
+                score += 12
+            elif row_e_date and row_e_date in text_lower:
                 score += 5
 
             if score > best_score:

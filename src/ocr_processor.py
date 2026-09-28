@@ -474,29 +474,45 @@ class CertificateOCRProcessor:
                 if not any(w in cand.lower() for w in ['certificate', 'participation', 'technology', 'hyderabad', 'ramaiah']):
                     result["FDP / PROGRAM NAME"] = cand.title()
 
+        # If program title contains trailing "at <Institution>" or "held at <Institution>", split off the institution
+        if result["FDP / PROGRAM NAME"]:
+            split_m = re.split(r'\s+(?:held at|conducted at|organized at|\bat\b)\s+', result["FDP / PROGRAM NAME"], flags=re.IGNORECASE)
+            if len(split_m) >= 2:
+                title_part = split_m[0].strip(" -\"'")
+                inst_part = split_m[1].strip(" -\"'")
+                if len(title_part) > 5:
+                    result["FDP / PROGRAM NAME"] = title_part
+                if inst_part and (not result["PROGRAM INSTITUTION"] or result["PROGRAM INSTITUTION"] in ["Unknown", "Ramaiah Institute of Technology"]):
+                    result["PROGRAM INSTITUTION"] = normalize_institution(inst_part)
+
         # ==============================================================
         # 5. PROGRAM INSTITUTION
         # ==============================================================
-        if not result["PROGRAM INSTITUTION"]:
+        if not result["PROGRAM INSTITUTION"] or result["PROGRAM INSTITUTION"] == "Unknown":
             m = re.search(
-                r'(?:organized|conducted)\s+by\s+([^,\.]{4,100}(?:NIT|BITS|IIT|IIIT|College|Institute|University|Academy|TCS|SwipeGen|RVITM)[^,\.]*)',
+                r'(?:organized|conducted|held)\s+(?:by|at|jointly by)?\s+([^,\.\n\r]{4,120}(?:NIT|BITS|IIT|IIIT|College|Institute|University|Academy|TCS|SwipeGen|RVITM|RV\s+Institute)[^,\.\n\r]*)',
                 flat, re.IGNORECASE
             )
             if m:
                 raw_org = m.group(1).strip()
                 inst_tok = re.search(
-                    r'(NIT[\s,]+[A-Za-z]+|BITS Pilani[\w\s]*|IIT[\s,]+[A-Za-z]+|IIIT[\s,]+[A-Za-z]+|BMS College of Engineering|Ramaiah Institute of Technology|MSRIT|RIT|Electronics and ICT Academy[\w\s,]*)',
+                    r'(RVITM|RV\s+Institute\s+of\s+Technology[\w\s]*|NIT[\s,]+[A-Za-z]+|BITS Pilani[\w\s]*|IIT[\s,]+[A-Za-z]+|IIIT[\s,]+[A-Za-z]+|BMS College of Engineering|Ramaiah Institute of Technology|MSRIT|RIT|Electronics and ICT Academy[\w\s,]*)',
                     raw_org, re.IGNORECASE
                 )
                 result["PROGRAM INSTITUTION"] = normalize_institution(
                     inst_tok.group(1) if inst_tok else raw_org
                 )
 
-        if not result["PROGRAM INSTITUTION"]:
+        if not result["PROGRAM INSTITUTION"] or result["PROGRAM INSTITUTION"] == "Unknown":
+            # Search external institutions FIRST before checking Ramaiah, to prevent
+            # faculty affiliation ("Dr. X of Ramaiah Institute of Technology") from hijacking
+            # the program institution.
             for pat in [
+                r'\b(RVITM|RV\s+Institute\s+of\s+Technology(?:\s+and\s+Management)?)\b',
                 r'\b(Electronics and ICT Academy[\w\s,]*)\b',
                 r'\b(NIT[\s,]+[A-Za-z]+|National Institute of Technology[\s,]+[A-Za-z]+)\b',
-                r'\b(BITS Pilani[\w\s]*|IIT[\s,]+[A-Za-z]+|IIIT[\s,]+[A-Za-z]+|BMS College of Engineering)\b',
+                r'\b(BITS Pilani[\w\s]*|IIT[\s,]+[A-Za-z]+|IIIT[\s,]+[A-Za-z]+|BMS College of Engineering|BMSCE)\b',
+                r'\b(SwipeGen|JAIN|TCS\b|Tata Consultancy Services)\b',
                 r'\b(Ramaiah Institute of Technology|MSRIT|RIT|M\.S\.\s*Ramaiah Institute of Technology)\b',
             ]:
                 m = re.search(pat, flat, re.IGNORECASE)

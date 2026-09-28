@@ -97,7 +97,10 @@ class CertificateProcessor:
         inst = parsed.get("PROGRAM INSTITUTION", "").strip()
         normalized_inst = normalize_institution(inst) if inst else "Unknown"
         parsed['PROGRAM INSTITUTION'] = normalized_inst
-        parsed['PROGRAM TYPE'] = "INTERNAL" if is_internal_program(normalized_inst) else "EXTERNAL"
+        if normalized_inst == "Unknown":
+            parsed['PROGRAM TYPE'] = "UNKNOWN"
+        else:
+            parsed['PROGRAM TYPE'] = "INTERNAL" if is_internal_program(normalized_inst) else "EXTERNAL"
 
         # Dataset Consistency & Fallback Reconciliation:
         # Cross-reference with certificate_tracker.csv to guarantee consistency with dataset records
@@ -108,7 +111,9 @@ class CertificateProcessor:
             program_name=parsed.get("FDP / PROGRAM NAME"),
             filename=filename,
             raw_text=raw_text,
-            cert_id=parsed.get("CERTIFICATE ID")
+            cert_id=parsed.get("CERTIFICATE ID"),
+            start_date=parsed.get("START DATE"),
+            end_date=parsed.get("END DATE")
         )
 
         if tracker_match:
@@ -201,7 +206,12 @@ class CertificateProcessor:
         norm_inst = normalize_institution(inst)
 
         tracker_type = tracker_row.get("PROGRAM TYPE", "").strip().upper()
-        prog_type = tracker_type if tracker_type in ["INTERNAL", "EXTERNAL"] else ("INTERNAL" if is_internal_program(norm_inst) else "EXTERNAL")
+        if tracker_type in ["INTERNAL", "EXTERNAL"]:
+            prog_type = tracker_type
+        elif norm_inst == "Unknown":
+            prog_type = "UNKNOWN"
+        else:
+            prog_type = "INTERNAL" if is_internal_program(norm_inst) else "EXTERNAL"
 
         return {
             "CERTIFICATE ID": cid,
