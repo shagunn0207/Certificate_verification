@@ -107,36 +107,75 @@ class CertificateProcessor:
             institution=parsed.get("PROGRAM INSTITUTION"),
             program_name=parsed.get("FDP / PROGRAM NAME"),
             filename=filename,
-            raw_text=raw_text
+            raw_text=raw_text,
+            cert_id=parsed.get("CERTIFICATE ID")
         )
 
         if tracker_match:
             parsed['DATASET_MATCHED'] = True
             parsed['TRACKER_RECORD_ID'] = tracker_match.get('CERTIFICATE ID', '')
+            parsed['TRACKER_CERT_LINK'] = tracker_match.get('CERTIFICATE LINK', '')
 
-            # If start or end date was not captured by OCR, backfill from dataset
-            if not parsed.get("START DATE") and tracker_match.get("START DATE"):
-                parsed["START DATE"] = tracker_match["START DATE"]
-            if not parsed.get("END DATE") and tracker_match.get("END DATE"):
-                parsed["END DATE"] = tracker_match["END DATE"]
-            if not parsed.get("NUMBER OF DAYS") and tracker_match.get("NUMBER OF DAYS"):
-                parsed["NUMBER OF DAYS"] = tracker_match["NUMBER OF DAYS"]
+            # Preserve raw OCR extractions for explainability
+            parsed['RAW_OCR_FIELDS'] = {
+                'FACULTY ID': parsed.get('FACULTY ID'),
+                'FACULTY NAME': parsed.get('FACULTY NAME'),
+                'FDP / PROGRAM NAME': parsed.get('FDP / PROGRAM NAME'),
+                'PROGRAM INSTITUTION': parsed.get('PROGRAM INSTITUTION'),
+                'PROGRAM TYPE': parsed.get('PROGRAM TYPE'),
+                'START DATE': parsed.get('START DATE'),
+                'END DATE': parsed.get('END DATE'),
+                'NUMBER OF DAYS': parsed.get('NUMBER OF DAYS')
+            }
 
-            # If program name was not captured, backfill from dataset
-            if not parsed.get("FDP / PROGRAM NAME") and tracker_match.get("FDP / PROGRAM NAME"):
-                parsed["FDP / PROGRAM NAME"] = tracker_match["FDP / PROGRAM NAME"]
+            # ---------------------------------------------------------------
+            # GENERIC TRACKER RECONCILIATION (applies to ALL certificates)
+            # The tracker is the institutional ground-truth. When a reliable
+            # match is found, tracker values take precedence over noisy OCR.
+            # ---------------------------------------------------------------
 
-            # If certificate ID was not captured, backfill from dataset
-            if not parsed.get("CERTIFICATE ID") and tracker_match.get("CERTIFICATE ID"):
-                parsed["CERTIFICATE ID"] = tracker_match["CERTIFICATE ID"]
+            # 1. Faculty — prioritize authoritative tracker values
+            if tracker_match.get("FACULTY ID"):
+                parsed["FACULTY ID"] = tracker_match["FACULTY ID"].strip()
+            if tracker_match.get("FACULTY NAME"):
+                parsed["FACULTY NAME"] = tracker_match["FACULTY NAME"].strip()
+            recheck = self.data_loader.find_faculty(
+                faculty_id=parsed.get("FACULTY ID"),
+                faculty_name=parsed.get("FACULTY NAME")
+            )
+            if recheck:
+                parsed["FACULTY ID"] = recheck[0]
+                parsed["FACULTY NAME"] = recheck[1]
+                parsed["FACULTY_MATCHED"] = True
 
-            # If institution is Unknown, backfill from dataset
-            if (not parsed.get("PROGRAM INSTITUTION") or parsed.get("PROGRAM INSTITUTION") == "Unknown") and tracker_match.get("PROGRAM INSTITUTION"):
-                normalized_inst = normalize_institution(tracker_match["PROGRAM INSTITUTION"])
+            # 2. FDP / program name — tracker is authoritative
+            if tracker_match.get("FDP / PROGRAM NAME"):
+                parsed["FDP / PROGRAM NAME"] = tracker_match["FDP / PROGRAM NAME"].strip()
+
+            # 3. Certificate ID — tracker is authoritative
+            if tracker_match.get("CERTIFICATE ID"):
+                parsed["CERTIFICATE ID"] = tracker_match["CERTIFICATE ID"].strip()
+
+            # 4. Dates and duration — tracker is authoritative
+            if tracker_match.get("START DATE"):
+                parsed["START DATE"] = tracker_match["START DATE"].strip()
+            if tracker_match.get("END DATE"):
+                parsed["END DATE"] = tracker_match["END DATE"].strip()
+            if tracker_match.get("NUMBER OF DAYS"):
+                parsed["NUMBER OF DAYS"] = tracker_match["NUMBER OF DAYS"].strip()
+
+            # 5. Institution / Program-Type — authoritative from tracker
+            tracker_inst = tracker_match.get("PROGRAM INSTITUTION", "").strip()
+            if tracker_inst:
+                normalized_inst = normalize_institution(tracker_inst)
                 parsed["PROGRAM INSTITUTION"] = normalized_inst
-                parsed["PROGRAM TYPE"] = "INTERNAL" if is_internal_program(normalized_inst) else "EXTERNAL"
+                tracker_prog_type = tracker_match.get("PROGRAM TYPE", "").strip().upper()
+                if tracker_prog_type in ["INTERNAL", "EXTERNAL"]:
+                    parsed["PROGRAM TYPE"] = tracker_prog_type
+                else:
+                    parsed["PROGRAM TYPE"] = "INTERNAL" if is_internal_program(normalized_inst) else "EXTERNAL"
 
-        # Normalize dates
+        # Normalize dates to DD/MM/YYYY (idempotent — safe to call even if already normalized)
         if parsed.get("START DATE"):
             parsed["START DATE"] = normalize_date_to_ddmmyyyy(parsed["START DATE"]) or parsed["START DATE"]
         if parsed.get("END DATE"):
@@ -161,6 +200,9 @@ class CertificateProcessor:
         matched = self.data_loader.find_faculty(faculty_id=raw_fid, faculty_name=raw_fname)
         norm_inst = normalize_institution(inst)
 
+        tracker_type = tracker_row.get("PROGRAM TYPE", "").strip().upper()
+        prog_type = tracker_type if tracker_type in ["INTERNAL", "EXTERNAL"] else ("INTERNAL" if is_internal_program(norm_inst) else "EXTERNAL")
+
         return {
             "CERTIFICATE ID": cid,
             "FACULTY ID": matched[0] if matched else raw_fid,
@@ -168,7 +210,7 @@ class CertificateProcessor:
             "FACULTY_MATCHED": bool(matched),
             "FDP / PROGRAM NAME": title,
             "PROGRAM INSTITUTION": norm_inst,
-            "PROGRAM TYPE": "INTERNAL" if is_internal_program(norm_inst) else "EXTERNAL",
+            "PROGRAM TYPE": prog_type,
             "START DATE": normalize_date_to_ddmmyyyy(start_date) or start_date,
             "END DATE": normalize_date_to_ddmmyyyy(end_date) or end_date,
             "NUMBER OF DAYS": days,

@@ -44,8 +44,11 @@ class VerificationPipeline:
     ) -> Dict[str, Any]:
         """
         Executes end-to-end verification for a certificate from certificate_tracker.csv.
+        The original tracker row is treated as READ-ONLY; no fields are written back to it.
         """
         cert_data = self.cert_processor.process_existing_record(tracker_row)
+        # Preserve the original tracker result for audit comparison (read-only reference)
+        cert_data['TRACKER_ORIGINAL_RESULT'] = tracker_row.get('VERIFICATION RESULT', '').strip()
         return self._execute_core_pipeline(cert_data, save_to_history=save_to_history)
 
     def _execute_core_pipeline(self, cert_data: Dict[str, Any], save_to_history: bool = True) -> Dict[str, Any]:
@@ -99,7 +102,8 @@ class VerificationPipeline:
             "final_reason": final_reason
         }
 
-        # 5. Save verification history and update tracker if applicable
+        # 5. Save to verification history (results/verification_results.csv) ONLY.
+        #    NEVER write computed results back to the original certificate_tracker.csv.
         if save_to_history:
             history_record = self.history_manager.record_verification(
                 cert_data=cert_data,
@@ -109,19 +113,5 @@ class VerificationPipeline:
                 final_reason=final_reason
             )
             response["history_record"] = history_record
-
-            # Update tracker if certificate ID exists
-            cid = cert_data.get("CERTIFICATE ID")
-            if cid:
-                attendance_summary = ", ".join([f"{r['date']}: {r['status']}" for r in rule_output.get("DAILY_ATTENDANCE", [])])
-                self.data_loader.update_certificate_tracker_row(
-                    cert_id=cid,
-                    updates={
-                        "ATTENDANCE STATUS": attendance_summary or "CHECKED",
-                        "TIMELINE MATCH": rule_output.get("TIMELINE_MATCH", "N/A"),
-                        "VERIFICATION RESULT": final_result,
-                        "VERIFICATION REASON": final_reason
-                    }
-                )
 
         return response

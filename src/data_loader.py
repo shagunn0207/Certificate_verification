@@ -195,19 +195,55 @@ class DataLoader:
         institution: Optional[str] = None,
         program_name: Optional[str] = None,
         filename: Optional[str] = None,
-        raw_text: Optional[str] = None
+        raw_text: Optional[str] = None,
+        cert_id: Optional[str] = None
     ) -> Optional[Dict[str, str]]:
         """
         Cross-references an uploaded certificate against certificate_tracker.csv
-        to ensure consistency with the institutional dataset.
-        Matches candidate records for the faculty member using institution,
-        program keywords, dates, and filename tokens.
+        to ensure consistency with institutional dataset records.
+
+        Priority order:
+        1. Exact Certificate ID match (from explicit ID, filename, or raw OCR)
+        2. Google Drive file ID match (from certificate link vs filename / text)
+        3. Faculty candidate filtering + keyword scoring (program, institution, dates)
         """
         tracker_rows = self.get_certificate_tracker_rows()
         if not tracker_rows:
             return None
 
-        # 1. Filter candidate rows by faculty
+        filename_str = filename or ""
+        raw_text_str = raw_text or ""
+        filename_lower = filename_str.lower()
+        text_lower = raw_text_str.lower()
+        combined_text = f"{filename_str} {raw_text_str}"
+
+        # 1. Certificate ID matching
+        target_cids = set()
+        if cert_id:
+            target_cids.add(cert_id.strip().upper())
+        found_cids = re.findall(r'CERT-\d+', combined_text, re.IGNORECASE)
+        for cid in found_cids:
+            target_cids.add(cid.strip().upper())
+
+        if target_cids:
+            for row in tracker_rows:
+                row_cid = row.get("CERTIFICATE ID", "").strip().upper()
+                if row_cid in target_cids:
+                    return row
+
+        # 2. Source / Google Drive Link matching
+        for row in tracker_rows:
+            link = row.get("CERTIFICATE LINK", "").strip()
+            if not link:
+                continue
+            # Extract Drive file ID if present (e.g., id=1XXMet48... or /d/1XXMet48...)
+            drive_id_match = re.search(r'[?&]id=([a-zA-Z0-9_-]+)', link) or re.search(r'/d/([a-zA-Z0-9_-]+)', link)
+            if drive_id_match:
+                drive_file_id = drive_id_match.group(1)
+                if len(drive_file_id) >= 8 and (drive_file_id in filename_str or drive_file_id in raw_text_str):
+                    return row
+
+        # 3. Filter candidate rows by faculty if available
         candidates = []
         fid_clean = (faculty_id or "").strip().upper()
         fname_clean = (faculty_name or "").strip().lower()
@@ -226,14 +262,12 @@ class DataLoader:
         if len(candidates) == 1 and fid_clean and candidates[0].get("FACULTY ID") == fid_clean:
             return candidates[0]
 
-        # 2. Score candidates by filename, institution, program title, and text
+        # 4. Score candidates by filename, institution, program title, and text
         best_row = None
         best_score = 0
 
-        filename_lower = (filename or "").lower()
         inst_lower = (institution or "").lower()
         prog_lower = (program_name or "").lower()
-        text_lower = (raw_text or "").lower()
 
         for row in candidates:
             score = 0
@@ -241,9 +275,9 @@ class DataLoader:
             row_prog = row.get("FDP / PROGRAM NAME", "").lower()
             row_cid = row.get("CERTIFICATE ID", "").lower()
 
-            # Filename keywords
-            if row_cid and row_cid in filename_lower:
-                score += 10
+            if row_cid and (row_cid in filename_lower or row_cid in text_lower):
+                score += 15
+
             for kw in re.findall(r'[a-z0-9]{3,}', row_prog):
                 if kw in ['and', 'for', 'the', 'with', 'course', 'program', 'programme', 'development']:
                     continue
@@ -252,7 +286,6 @@ class DataLoader:
                 if kw in text_lower:
                     score += 2
 
-            # Institution keywords (e.g. iiit, bms, nit, rit, msrit, tcs)
             for kw in re.findall(r'[a-z0-9]{3,}', row_inst):
                 if kw in ['and', 'the', 'for', 'institute', 'technology', 'college', 'engineering']:
                     continue
@@ -261,11 +294,9 @@ class DataLoader:
                 if kw in text_lower:
                     score += 2
 
-            # Exact or partial institution match
             if inst_lower and inst_lower != "unknown" and (inst_lower in row_inst or row_inst in inst_lower):
                 score += 5
 
-            # Dates in raw text
             s_date = row.get("START DATE", "")
             e_date = row.get("END DATE", "")
             if s_date and s_date in text_lower:

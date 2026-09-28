@@ -20,6 +20,8 @@ HISTORY_HEADERS = [
     "ML Confidence",
     "Rule Result",
     "Final Result",
+    "Tracker Original Result",
+    "Agreement",
     "Reason"
 ]
 
@@ -41,9 +43,17 @@ class VerificationHistoryManager:
     def record_verification(self, cert_data: Dict[str, Any], rule_output: Dict[str, Any], ml_output: Dict[str, Any], final_result: str, final_reason: str) -> Dict[str, Any]:
         """
         Appends a new verification event to verification_results.csv.
+        Never modifies the original certificate_tracker.csv.
         """
         verif_id = f"VERIF-{datetime.now().strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:4].upper()}"
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        tracker_original = cert_data.get("TRACKER_ORIGINAL_RESULT", "").strip().upper()
+        final_upper = final_result.strip().upper()
+        if tracker_original:
+            agreement = "YES" if final_upper == tracker_original else "NO (DISAGREE)"
+        else:
+            agreement = "N/A (no tracker ref)"
 
         row = {
             "Verification ID": verif_id,
@@ -61,6 +71,8 @@ class VerificationHistoryManager:
             "ML Confidence": f"{ml_output.get('confidence', 0.0) * 100:.1f}%",
             "Rule Result": rule_output.get("RULE_RESULT", "N/A"),
             "Final Result": final_result,
+            "Tracker Original Result": tracker_original,
+            "Agreement": agreement,
             "Reason": final_reason
         }
 
