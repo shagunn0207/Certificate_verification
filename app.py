@@ -1,6 +1,7 @@
 import os
 import io
 import time
+import re
 import pandas as pd
 import streamlit as st
 from datetime import datetime
@@ -86,6 +87,14 @@ st.markdown("""
         color: #fbbf24;
     }
 
+    .result-banner-duplicate {
+        background: linear-gradient(135deg, rgba(168, 85, 247, 0.18) 0%, rgba(139, 92, 246, 0.06) 100%);
+        border: 1px solid #a855f7;
+        border-radius: 14px;
+        padding: 20px;
+        color: #c084fc;
+    }
+
     .badge {
         display: inline-block;
         padding: 4px 10px;
@@ -98,6 +107,23 @@ st.markdown("""
     .badge-review { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #f59e0b; }
     .badge-internal { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid #3b82f6; }
     .badge-external { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid #a855f7; }
+    .badge-duplicate { background: rgba(168, 85, 247, 0.25); color: #e9d5ff; border: 1px solid #a855f7; }
+
+    .faculty-group-header {
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.7) 100%);
+        border: 1px solid rgba(99, 102, 241, 0.3);
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin: 12px 0 8px 0;
+    }
+
+    .feedback-card {
+        background: rgba(30, 41, 59, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 18px;
+        margin-top: 12px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -124,7 +150,7 @@ with st.sidebar:
 
     page = st.radio(
         "Navigation",
-        ["📊 Dashboard", "🔍 Verify New Certificate", "📁 Existing Certificates", "📜 Verification History", "🤖 Model Performance", "ℹ️ About"],
+        ["📊 Dashboard", "🔍 Verify New Certificate", "📁 Existing Certificates", "📜 Verification History", "🤖 Model Performance", "💬 Feedback", "ℹ️ About"],
         label_visibility="collapsed"
     )
 
@@ -172,6 +198,82 @@ def render_metrics_cards(stats):
         </div>
         """, unsafe_allow_html=True)
 
+
+def _normalize_group_key(value: str) -> str:
+    """Normalize a string for grouping: lowercase, strip, collapse whitespace."""
+    if not value:
+        return ""
+    clean = value.strip().lower()
+    clean = re.sub(r'\s+', ' ', clean)
+    return clean
+
+
+def _normalize_faculty_display(name: str) -> str:
+    """Return a clean display name preserving original casing but fixing spacing."""
+    if not name:
+        return "Unknown"
+    return re.sub(r'\s+', ' ', name.strip())
+
+
+def render_feedback_section(verification_id: str, certificate_id: str,
+                           faculty_name: str, fdp_name: str,
+                           is_duplicate: bool = False):
+    """Renders the feedback form after verification or duplicate detection."""
+    st.markdown("---")
+    st.markdown("#### 💬 Submit Feedback")
+
+    if is_duplicate:
+        st.markdown("""
+        <div class='feedback-card'>
+            <div style='font-size:15px; font-weight:700; color:#c084fc; margin-bottom:8px;'>
+                🔍 Was this duplicate detection correct?
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        fb_type = st.radio(
+            "Duplicate detection accuracy",
+            ["Yes — duplicate detected correctly",
+             "No — this is NOT a duplicate"],
+            key=f"dup_fb_{verification_id}",
+            label_visibility="collapsed"
+        )
+        fb_comment = st.text_area(
+            "Tell us what was wrong (optional)",
+            key=f"dup_comment_{verification_id}",
+            placeholder="Describe any issue with the duplicate detection..."
+        )
+    else:
+        fb_type = st.radio(
+            "How accurate was this verification result?",
+            ["Correct result",
+             "Incorrect result",
+             "Duplicate detected incorrectly",
+             "Duplicate was not detected",
+             "Other"],
+            key=f"fb_type_{verification_id}"
+        )
+        fb_comment = st.text_area(
+            "Additional comments (optional)",
+            key=f"fb_comment_{verification_id}",
+            placeholder="Share details about the verification accuracy..."
+        )
+
+    if st.button("📩 Submit Feedback", key=f"fb_submit_{verification_id}"):
+        try:
+            pipeline.history_manager.record_feedback(
+                verification_id=verification_id,
+                certificate_id=certificate_id,
+                faculty_name=faculty_name,
+                fdp_name=fdp_name,
+                feedback_type=fb_type,
+                comment=fb_comment,
+                is_duplicate_context=is_duplicate
+            )
+            st.success("✅ Thank you! Your feedback has been saved successfully.")
+        except Exception as e:
+            st.error(f"Error saving feedback: {e}")
+
+
 # PAGE 1: DASHBOARD
 if page == "📊 Dashboard":
     st.markdown("""
@@ -213,11 +315,58 @@ if page == "📊 Dashboard":
             st.info("No monthly data available yet.")
 
     st.markdown("---")
-    st.subheader("👨‍🏫 Faculty Verification Summary")
-    fac_data = stats.get("faculty_breakdown", {})
-    if fac_data:
-        f_df = pd.DataFrame(list(fac_data.items()), columns=["Faculty Name", "Verified Submissions"]).sort_values("Verified Submissions", ascending=False)
-        st.dataframe(f_df, use_container_width=True, hide_index=True)
+
+    # Faculty + Department Grouping in Dashboard
+    st.subheader("👨‍🏫 Faculty Verification Summary (Grouped)")
+    unique_records = pipeline.history_manager.get_unique_records()
+    if unique_records:
+        # Build groups by normalized faculty name + institution (as department proxy)
+        groups = {}
+        for r in unique_records:
+            fname_display = _normalize_faculty_display(r.get("Faculty Name", "Unknown"))
+            dept_display = _normalize_faculty_display(r.get("Institution", "Unknown"))
+            # Grouping key: normalized (lowercase, trimmed) version
+            group_key = (_normalize_group_key(r.get("Faculty Name", "")),
+                         _normalize_group_key(r.get("Institution", "")))
+            if group_key not in groups:
+                groups[group_key] = {
+                    "faculty_display": fname_display,
+                    "dept_display": dept_display,
+                    "certificates": []
+                }
+            groups[group_key]["certificates"].append(r)
+
+        # Sort by faculty name
+        sorted_groups = sorted(groups.values(), key=lambda g: g["faculty_display"].lower())
+
+        for g in sorted_groups:
+            cert_count = len(g["certificates"])
+            st.markdown(f"""
+            <div class='faculty-group-header'>
+                <div style='display:flex; justify-content:space-between; align-items:center;'>
+                    <div>
+                        <span style='font-size:16px; font-weight:700; color:#e2e8f0;'>👤 {g['faculty_display']}</span>
+                        <span style='font-size:13px; color:#94a3b8; margin-left:12px;'>📍 {g['dept_display']}</span>
+                    </div>
+                    <div>
+                        <span class='badge badge-internal'>{cert_count} certificate{'s' if cert_count != 1 else ''}</span>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            certs_df = pd.DataFrame([{
+                "Certificate ID": c.get("Certificate ID", ""),
+                "FDP Name": c.get("FDP Name", ""),
+                "Start Date": c.get("Start Date", ""),
+                "End Date": c.get("End Date", ""),
+                "Result": c.get("Final Result", ""),
+                "Type": c.get("Internal/External", "")
+            } for c in g["certificates"]])
+            st.dataframe(certs_df, use_container_width=True, hide_index=True)
+    else:
+        st.info("No verification records available yet.")
+
 
 # PAGE 2: VERIFY NEW CERTIFICATE
 elif page == "🔍 Verify New Certificate":
@@ -272,7 +421,10 @@ elif page == "🔍 Verify New Certificate":
                             save_to_history=True
                         )
                         st.session_state["last_verification"] = res
-                        st.success("Verification complete! Results generated below.")
+                        if res.get("is_duplicate"):
+                            st.warning("⚠️ Duplicate certificate detected! See details below.")
+                        else:
+                            st.success("Verification complete! Results generated below.")
                     except ValueError as ve:
                         st.error(str(ve))
                     except Exception as e:
@@ -290,8 +442,22 @@ elif page == "🔍 Verify New Certificate":
                     "PROGRAM INSTITUTION": "BMS College of Engineering Bangalore", "PROGRAM TYPE": "EXTERNAL",
                     "START DATE": "09/02/2026", "END DATE": "13/02/2026", "NUMBER OF DAYS": "5"
                 }
-                res = pipeline._execute_core_pipeline(mock_cert, save_to_history=True)
-                st.session_state["last_verification"] = res
+                # Check for duplicate before running pipeline
+                dup = pipeline.history_manager.find_duplicate(mock_cert)
+                if dup:
+                    st.session_state["last_verification"] = {
+                        "is_duplicate": True,
+                        "cert_data": mock_cert,
+                        "duplicate_of": dup,
+                        "final_result": "DUPLICATE",
+                        "final_reason": "This certificate already exists in the system. No new record was added and counts were not increased.",
+                        "rule_output": {},
+                        "ml_output": {"prediction": "N/A", "confidence": 0.0, "probabilities": {}},
+                        "features": {}
+                    }
+                else:
+                    res = pipeline._execute_core_pipeline(mock_cert, save_to_history=True)
+                    st.session_state["last_verification"] = res
                 st.rerun()
 
             if st.button("🔴 Scenario 2: External + Casual Leave Conflict", use_container_width=True):
@@ -301,8 +467,21 @@ elif page == "🔍 Verify New Certificate":
                     "PROGRAM INSTITUTION": "IIT Hyderabad", "PROGRAM TYPE": "EXTERNAL",
                     "START DATE": "28/07/2025", "END DATE": "01/08/2025", "NUMBER OF DAYS": "5"
                 }
-                res = pipeline._execute_core_pipeline(mock_cert, save_to_history=True)
-                st.session_state["last_verification"] = res
+                dup = pipeline.history_manager.find_duplicate(mock_cert)
+                if dup:
+                    st.session_state["last_verification"] = {
+                        "is_duplicate": True,
+                        "cert_data": mock_cert,
+                        "duplicate_of": dup,
+                        "final_result": "DUPLICATE",
+                        "final_reason": "This certificate already exists in the system. No new record was added and counts were not increased.",
+                        "rule_output": {},
+                        "ml_output": {"prediction": "N/A", "confidence": 0.0, "probabilities": {}},
+                        "features": {}
+                    }
+                else:
+                    res = pipeline._execute_core_pipeline(mock_cert, save_to_history=True)
+                    st.session_state["last_verification"] = res
                 st.rerun()
 
             if st.button("🔴 Scenario 3: Critical Multi-Day Conflict (10-12/09/2026)", use_container_width=True):
@@ -318,8 +497,21 @@ elif page == "🔍 Verify New Certificate":
                     "PROGRAM INSTITUTION": "NIT Surathkal", "PROGRAM TYPE": "EXTERNAL",
                     "START DATE": "10/09/2026", "END DATE": "12/09/2026", "NUMBER OF DAYS": "3"
                 }
-                res = pipeline._execute_core_pipeline(mock_cert, save_to_history=True)
-                st.session_state["last_verification"] = res
+                dup = pipeline.history_manager.find_duplicate(mock_cert)
+                if dup:
+                    st.session_state["last_verification"] = {
+                        "is_duplicate": True,
+                        "cert_data": mock_cert,
+                        "duplicate_of": dup,
+                        "final_result": "DUPLICATE",
+                        "final_reason": "This certificate already exists in the system. No new record was added and counts were not increased.",
+                        "rule_output": {},
+                        "ml_output": {"prediction": "N/A", "confidence": 0.0, "probabilities": {}},
+                        "features": {}
+                    }
+                else:
+                    res = pipeline._execute_core_pipeline(mock_cert, save_to_history=True)
+                    st.session_state["last_verification"] = res
                 st.rerun()
 
         with p_col2:
@@ -330,8 +522,21 @@ elif page == "🔍 Verify New Certificate":
                     "PROGRAM INSTITUTION": "External University", "PROGRAM TYPE": "EXTERNAL",
                     "START DATE": "10/09/2026", "END DATE": "12/09/2026", "NUMBER OF DAYS": "3"
                 }
-                res = pipeline._execute_core_pipeline(mock_cert, save_to_history=True)
-                st.session_state["last_verification"] = res
+                dup = pipeline.history_manager.find_duplicate(mock_cert)
+                if dup:
+                    st.session_state["last_verification"] = {
+                        "is_duplicate": True,
+                        "cert_data": mock_cert,
+                        "duplicate_of": dup,
+                        "final_result": "DUPLICATE",
+                        "final_reason": "This certificate already exists in the system. No new record was added and counts were not increased.",
+                        "rule_output": {},
+                        "ml_output": {"prediction": "N/A", "confidence": 0.0, "probabilities": {}},
+                        "features": {}
+                    }
+                else:
+                    res = pipeline._execute_core_pipeline(mock_cert, save_to_history=True)
+                    st.session_state["last_verification"] = res
                 st.rerun()
 
             if st.button("🟡 Scenario 5: Single Date Missing in Month", use_container_width=True):
@@ -347,8 +552,21 @@ elif page == "🔍 Verify New Certificate":
                     "PROGRAM INSTITUTION": "External Tech Institute", "PROGRAM TYPE": "EXTERNAL",
                     "START DATE": "10/09/2026", "END DATE": "12/09/2026", "NUMBER OF DAYS": "3"
                 }
-                res = pipeline._execute_core_pipeline(mock_cert, save_to_history=True)
-                st.session_state["last_verification"] = res
+                dup = pipeline.history_manager.find_duplicate(mock_cert)
+                if dup:
+                    st.session_state["last_verification"] = {
+                        "is_duplicate": True,
+                        "cert_data": mock_cert,
+                        "duplicate_of": dup,
+                        "final_result": "DUPLICATE",
+                        "final_reason": "This certificate already exists in the system. No new record was added and counts were not increased.",
+                        "rule_output": {},
+                        "ml_output": {"prediction": "N/A", "confidence": 0.0, "probabilities": {}},
+                        "features": {}
+                    }
+                else:
+                    res = pipeline._execute_core_pipeline(mock_cert, save_to_history=True)
+                    st.session_state["last_verification"] = res
                 st.rerun()
 
             if st.button("🟢 Scenario 6: Valid Internal FDP (MSRIT)", use_container_width=True):
@@ -358,98 +576,179 @@ elif page == "🔍 Verify New Certificate":
                     "PROGRAM INSTITUTION": "Ramaiah Institute of Technology", "PROGRAM TYPE": "INTERNAL",
                     "START DATE": "07/07/2025", "END DATE": "11/07/2025", "NUMBER OF DAYS": "5"
                 }
-                res = pipeline._execute_core_pipeline(mock_cert, save_to_history=True)
-                st.session_state["last_verification"] = res
+                dup = pipeline.history_manager.find_duplicate(mock_cert)
+                if dup:
+                    st.session_state["last_verification"] = {
+                        "is_duplicate": True,
+                        "cert_data": mock_cert,
+                        "duplicate_of": dup,
+                        "final_result": "DUPLICATE",
+                        "final_reason": "This certificate already exists in the system. No new record was added and counts were not increased.",
+                        "rule_output": {},
+                        "ml_output": {"prediction": "N/A", "confidence": 0.0, "probabilities": {}},
+                        "features": {}
+                    }
+                else:
+                    res = pipeline._execute_core_pipeline(mock_cert, save_to_history=True)
+                    st.session_state["last_verification"] = res
                 st.rerun()
 
     # RENDER LAST VERIFICATION RESULT
     if "last_verification" in st.session_state:
         v = st.session_state["last_verification"]
         cert = v["cert_data"]
-        rule_out = v["rule_output"]
-        ml_out = v["ml_output"]
-        final_res = v["final_result"]
-        final_reason = v["final_reason"]
+        is_dup = v.get("is_duplicate", False)
 
         st.markdown("---")
-        st.subheader("📑 Verification Outcome & Explainable Evidence")
 
-        # Result Banner
-        if final_res == "VALID":
-            banner_class = "result-banner-valid"
-            badge_class = "badge-valid"
-            icon = "✅"
-        elif final_res == "INVALID":
-            banner_class = "result-banner-invalid"
-            badge_class = "badge-invalid"
-            icon = "❌"
-        else:
-            banner_class = "result-banner-review"
-            badge_class = "badge-review"
-            icon = "⚠️"
+        if is_dup:
+            # ===== DUPLICATE DETECTED UI =====
+            dup_record = v.get("duplicate_of", {})
 
-        st.markdown(f"""
-        <div class='{banner_class}'>
-            <div style='display:flex; justify-content:space-between; align-items:center;'>
-                <div style='font-size:22px; font-weight:800;'>{icon} RESULT: {final_res}</div>
-                <div><span class='badge {badge_class}'>{final_res}</span></div>
-            </div>
-            <div style='margin-top:10px; font-size:15px; font-weight:500; color:#f8fafc;'>
-                <strong>Reason:</strong> {final_reason}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
-
-        col_d1, col_d2 = st.columns(2)
-        with col_d1:
-            st.markdown("#### 👤 Faculty & Program Details")
-            ptype = cert.get('PROGRAM TYPE', 'EXTERNAL')
-            type_badge = "badge-internal" if ptype == "INTERNAL" else "badge-external"
             st.markdown(f"""
-            - **Faculty Name:** {cert.get('FACULTY NAME', 'N/A')}
-            - **Faculty ID:** `{cert.get('FACULTY ID', 'N/A')}`
-            - **FDP / Program:** {cert.get('FDP / PROGRAM NAME', 'N/A')}
-            - **Institution:** {cert.get('PROGRAM INSTITUTION', 'N/A')}
-            - **Program Type:** <span class='badge {type_badge}'>{ptype}</span>
-            - **FDP Dates:** `{cert.get('START DATE', 'N/A')}` to `{cert.get('END DATE', 'N/A')}` ({rule_out.get('ACTUAL_DAYS', cert.get('NUMBER OF DAYS', 'N/A'))} days)
+            <div class='result-banner-duplicate'>
+                <div style='display:flex; justify-content:space-between; align-items:center;'>
+                    <div style='font-size:22px; font-weight:800;'>🔁 DUPLICATE CERTIFICATE DETECTED</div>
+                    <div><span class='badge badge-duplicate'>DUPLICATE</span></div>
+                </div>
+                <div style='margin-top:10px; font-size:15px; font-weight:500; color:#f8fafc;'>
+                    This certificate already exists in the system. <strong>No new record was added</strong> and <strong>counts were not increased</strong>.
+                </div>
+            </div>
             """, unsafe_allow_html=True)
 
-        with col_d2:
-            st.markdown("#### 🤖 Decision Engine Breakdown")
-            st.markdown(f"""
-            - **Rule Engine Verification:** `{rule_out.get('RULE_RESULT', 'N/A')}`
-            - **Timeline Duration Match:** `{rule_out.get('TIMELINE_MATCH', 'N/A')}`
-            - **ML Model Prediction:** `{ml_out.get('prediction', 'N/A')}` ({ml_out.get('confidence', 0.0)*100:.1f}% confidence)
-            - **Hybrid Consensus:** `{final_res}`
-            """)
-            st.caption("Class Probabilities:")
-            st.json(ml_out.get("probabilities", {}))
+            st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
 
-        st.markdown("#### 📅 Multi-Day Attendance Audit Trail")
-        daily = rule_out.get("DAILY_ATTENDANCE", [])
-        if daily:
-            daily_table = []
-            for item in daily:
-                flag = item.get("flag", "")
-                if flag == "VALID":
-                    status_chip = "✅ VALID"
-                elif flag == "CONFLICT":
-                    status_chip = "❌ CONFLICT"
-                elif flag in ["MISSING_DATE", "MISSING_MONTH"]:
-                    status_chip = "⚠️ UNAVAILABLE"
-                else:
-                    status_chip = "ℹ️ RECORDED"
+            col_new, col_existing = st.columns(2)
+            with col_new:
+                st.markdown("#### 📄 Uploaded Certificate Info")
+                st.markdown(f"""
+                - **Faculty Name:** {cert.get('FACULTY NAME', 'N/A')}
+                - **Faculty ID:** `{cert.get('FACULTY ID', 'N/A')}`
+                - **FDP / Program:** {cert.get('FDP / PROGRAM NAME', 'N/A')}
+                - **Institution:** {cert.get('PROGRAM INSTITUTION', 'N/A')}
+                - **Dates:** `{cert.get('START DATE', 'N/A')}` to `{cert.get('END DATE', 'N/A')}`
+                """)
 
-                daily_table.append({
-                    "Date": item.get("date"),
-                    "Attendance Status": item.get("status"),
-                    "Verification Status": status_chip
-                })
-            st.dataframe(pd.DataFrame(daily_table), use_container_width=True, hide_index=True)
+            with col_existing:
+                st.markdown("#### 📋 Matching Existing Record")
+                st.markdown(f"""
+                - **Verification ID:** `{dup_record.get('Verification ID', 'N/A')}`
+                - **Faculty Name:** {dup_record.get('Faculty Name', 'N/A')}
+                - **Faculty ID:** `{dup_record.get('Faculty ID', 'N/A')}`
+                - **FDP / Program:** {dup_record.get('FDP Name', 'N/A')}
+                - **Institution:** {dup_record.get('Institution', 'N/A')}
+                - **Dates:** `{dup_record.get('Start Date', 'N/A')}` to `{dup_record.get('End Date', 'N/A')}`
+                - **Original Result:** `{dup_record.get('Final Result', 'N/A')}`
+                - **Verified On:** {dup_record.get('Timestamp', 'N/A')}
+                """)
+
+            st.info("ℹ️ The original verification record has been kept. This duplicate upload was ignored to prevent inflating counts and creating redundant records.")
+
+            # Duplicate feedback section
+            render_feedback_section(
+                verification_id=dup_record.get("Verification ID", "DUP"),
+                certificate_id=cert.get("CERTIFICATE ID", dup_record.get("Certificate ID", "")),
+                faculty_name=cert.get("FACULTY NAME", ""),
+                fdp_name=cert.get("FDP / PROGRAM NAME", ""),
+                is_duplicate=True
+            )
+
         else:
-            st.info("No individual date attendance records available.")
+            # ===== NORMAL VERIFICATION RESULT =====
+            rule_out = v["rule_output"]
+            ml_out = v["ml_output"]
+            final_res = v["final_result"]
+            final_reason = v["final_reason"]
+
+            st.subheader("📑 Verification Outcome & Explainable Evidence")
+
+            # Result Banner
+            if final_res == "VALID":
+                banner_class = "result-banner-valid"
+                badge_class = "badge-valid"
+                icon = "✅"
+            elif final_res == "INVALID":
+                banner_class = "result-banner-invalid"
+                badge_class = "badge-invalid"
+                icon = "❌"
+            else:
+                banner_class = "result-banner-review"
+                badge_class = "badge-review"
+                icon = "⚠️"
+
+            st.markdown(f"""
+            <div class='{banner_class}'>
+                <div style='display:flex; justify-content:space-between; align-items:center;'>
+                    <div style='font-size:22px; font-weight:800;'>{icon} RESULT: {final_res}</div>
+                    <div><span class='badge {badge_class}'>{final_res}</span></div>
+                </div>
+                <div style='margin-top:10px; font-size:15px; font-weight:500; color:#f8fafc;'>
+                    <strong>Reason:</strong> {final_reason}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
+
+            col_d1, col_d2 = st.columns(2)
+            with col_d1:
+                st.markdown("#### 👤 Faculty & Program Details")
+                ptype = cert.get('PROGRAM TYPE', 'EXTERNAL')
+                type_badge = "badge-internal" if ptype == "INTERNAL" else "badge-external"
+                st.markdown(f"""
+                - **Faculty Name:** {cert.get('FACULTY NAME', 'N/A')}
+                - **Faculty ID:** `{cert.get('FACULTY ID', 'N/A')}`
+                - **FDP / Program:** {cert.get('FDP / PROGRAM NAME', 'N/A')}
+                - **Institution:** {cert.get('PROGRAM INSTITUTION', 'N/A')}
+                - **Program Type:** <span class='badge {type_badge}'>{ptype}</span>
+                - **FDP Dates:** `{cert.get('START DATE', 'N/A')}` to `{cert.get('END DATE', 'N/A')}` ({rule_out.get('ACTUAL_DAYS', cert.get('NUMBER OF DAYS', 'N/A'))} days)
+                """, unsafe_allow_html=True)
+
+            with col_d2:
+                st.markdown("#### 🤖 Decision Engine Breakdown")
+                st.markdown(f"""
+                - **Rule Engine Verification:** `{rule_out.get('RULE_RESULT', 'N/A')}`
+                - **Timeline Duration Match:** `{rule_out.get('TIMELINE_MATCH', 'N/A')}`
+                - **ML Model Prediction:** `{ml_out.get('prediction', 'N/A')}` ({ml_out.get('confidence', 0.0)*100:.1f}% confidence)
+                - **Hybrid Consensus:** `{final_res}`
+                """)
+                st.caption("Class Probabilities:")
+                st.json(ml_out.get("probabilities", {}))
+
+            st.markdown("#### 📅 Multi-Day Attendance Audit Trail")
+            daily = rule_out.get("DAILY_ATTENDANCE", [])
+            if daily:
+                daily_table = []
+                for item in daily:
+                    flag = item.get("flag", "")
+                    if flag == "VALID":
+                        status_chip = "✅ VALID"
+                    elif flag == "CONFLICT":
+                        status_chip = "❌ CONFLICT"
+                    elif flag in ["MISSING_DATE", "MISSING_MONTH"]:
+                        status_chip = "⚠️ UNAVAILABLE"
+                    else:
+                        status_chip = "ℹ️ RECORDED"
+
+                    daily_table.append({
+                        "Date": item.get("date"),
+                        "Attendance Status": item.get("status"),
+                        "Verification Status": status_chip
+                    })
+                st.dataframe(pd.DataFrame(daily_table), use_container_width=True, hide_index=True)
+            else:
+                st.info("No individual date attendance records available.")
+
+            # Verification feedback section
+            history_rec = v.get("history_record", {})
+            render_feedback_section(
+                verification_id=history_rec.get("Verification ID", "N/A"),
+                certificate_id=cert.get("CERTIFICATE ID", ""),
+                faculty_name=cert.get("FACULTY NAME", ""),
+                fdp_name=cert.get("FDP / PROGRAM NAME", ""),
+                is_duplicate=False
+            )
 
 # PAGE 3: EXISTING CERTIFICATES
 elif page == "📁 Existing Certificates":
@@ -512,8 +811,11 @@ elif page == "📁 Existing Certificates":
                     with st.spinner("Re-verifying certificate..."):
                         res = pipeline.verify_existing_certificate(selected_row, save_to_history=True)
                         st.session_state["last_verification"] = res
-                        st.success(f"Certificate {selected_cid} re-verified: {res['final_result']}")
-                        st.info(f"Reason: {res['final_reason']}")
+                        if res.get("is_duplicate"):
+                            st.warning(f"⚠️ Certificate {selected_cid} is already verified (duplicate detected).")
+                        else:
+                            st.success(f"Certificate {selected_cid} re-verified: {res['final_result']}")
+                            st.info(f"Reason: {res['final_reason']}")
                         time.sleep(1)
                         st.rerun()
 
@@ -521,10 +823,16 @@ elif page == "📁 Existing Certificates":
                 if st.button("⚡ BATCH REVERIFY ALL TRACKER CERTIFICATES", use_container_width=True):
                     with st.spinner("Batch verifying all certificates..."):
                         prog_bar = st.progress(0)
+                        dup_count = 0
+                        new_count = 0
                         for idx, row in enumerate(tracker_rows):
-                            pipeline.verify_existing_certificate(row, save_to_history=True)
+                            res = pipeline.verify_existing_certificate(row, save_to_history=True)
+                            if res.get("is_duplicate"):
+                                dup_count += 1
+                            else:
+                                new_count += 1
                             prog_bar.progress((idx + 1) / len(tracker_rows))
-                        st.success("Batch re-verification complete! Dashboard updated.")
+                        st.success(f"Batch re-verification complete! {new_count} verified, {dup_count} duplicates skipped. Dashboard updated.")
                         time.sleep(1)
                         st.rerun()
 
@@ -567,7 +875,9 @@ elif page == "📜 Verification History":
             filtered_hist = filtered_hist[filtered_hist.apply(lambda row: s_q in str(row).lower(), axis=1)]
 
         st.caption(f"Showing {len(filtered_hist)} of {len(df_hist)} log entries")
-        st.dataframe(filtered_hist, use_container_width=True, hide_index=True)
+        # Display without Fingerprint column for cleaner UI
+        display_cols = [c for c in filtered_hist.columns if c != "Fingerprint"]
+        st.dataframe(filtered_hist[display_cols], use_container_width=True, hide_index=True)
 
         csv_buffer = io.StringIO()
         filtered_hist.to_csv(csv_buffer, index=False)
@@ -577,6 +887,56 @@ elif page == "📜 Verification History":
             file_name=f"fdp_verification_history_{datetime.now().strftime('%Y%m%d')}.csv",
             mime="text/csv"
         )
+
+        # Faculty + Department grouped view for history
+        st.markdown("---")
+        st.subheader("👨‍🏫 Grouped by Faculty & Department")
+        unique_recs = pipeline.history_manager.get_unique_records()
+        if unique_recs:
+            groups = {}
+            for r in unique_recs:
+                fname_display = _normalize_faculty_display(r.get("Faculty Name", "Unknown"))
+                dept_display = _normalize_faculty_display(r.get("Institution", "Unknown"))
+                group_key = (_normalize_group_key(r.get("Faculty Name", "")),
+                             _normalize_group_key(r.get("Institution", "")))
+                if group_key not in groups:
+                    groups[group_key] = {
+                        "faculty_display": fname_display,
+                        "dept_display": dept_display,
+                        "certificates": []
+                    }
+                groups[group_key]["certificates"].append(r)
+
+            sorted_groups = sorted(groups.values(), key=lambda g: g["faculty_display"].lower())
+
+            for g in sorted_groups:
+                cert_count = len(g["certificates"])
+                st.markdown(f"""
+                <div class='faculty-group-header'>
+                    <div style='display:flex; justify-content:space-between; align-items:center;'>
+                        <div>
+                            <span style='font-size:15px; font-weight:700; color:#e2e8f0;'>👤 {g['faculty_display']}</span>
+                            <span style='font-size:13px; color:#94a3b8; margin-left:10px;'>📍 {g['dept_display']}</span>
+                        </div>
+                        <span class='badge badge-internal'>{cert_count} cert{'s' if cert_count != 1 else ''}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                for c in g["certificates"]:
+                    result = c.get("Final Result", "")
+                    if "INVALID" in result.upper():
+                        res_badge = "badge-invalid"
+                    elif "VALID" in result.upper():
+                        res_badge = "badge-valid"
+                    else:
+                        res_badge = "badge-review"
+                    st.markdown(f"""
+                    <div style='padding:6px 16px; margin:2px 0 2px 20px; font-size:13px; color:#cbd5e1;'>
+                        <span class='badge {res_badge}'>{result}</span>
+                        &nbsp; {c.get('FDP Name', '')} &nbsp;|&nbsp; {c.get('Start Date', '')} — {c.get('End Date', '')}
+                    </div>
+                    """, unsafe_allow_html=True)
 
 # PAGE 5: MODEL PERFORMANCE
 elif page == "🤖 Model Performance":
@@ -633,7 +993,69 @@ elif page == "🤖 Model Performance":
         else:
             st.info("Feature importances available for tree-based models.")
 
-# PAGE 6: ABOUT
+# PAGE 6: FEEDBACK
+elif page == "💬 Feedback":
+    st.markdown("""
+    <div class='header-banner'>
+        <h1 style='margin:0; font-size:26px; font-weight:800;'>💬 Feedback Dashboard</h1>
+        <p style='margin:4px 0 0 0; color:#94a3b8; font-size:14px;'>
+            View all user feedback submitted for verification results and duplicate detections.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    all_feedback = pipeline.history_manager.get_all_feedback()
+    if not all_feedback:
+        st.info("No feedback has been submitted yet. Feedback can be submitted after verifying a certificate on the '🔍 Verify New Certificate' page.")
+    else:
+        fb_df = pd.DataFrame(all_feedback)
+        st.caption(f"Total feedback entries: {len(fb_df)}")
+        st.dataframe(fb_df, use_container_width=True, hide_index=True)
+
+        csv_buffer = io.StringIO()
+        fb_df.to_csv(csv_buffer, index=False)
+        st.download_button(
+            label="📥 Download Feedback Log (CSV)",
+            data=csv_buffer.getvalue(),
+            file_name=f"fdp_feedback_{datetime.now().strftime('%Y%m%d')}.csv",
+            mime="text/csv"
+        )
+
+    st.markdown("---")
+    st.subheader("📩 Submit Standalone Feedback")
+    st.caption("Use this form to submit general feedback about the verification system.")
+
+    fb_standalone_type = st.radio(
+        "Feedback category",
+        ["Correct result", "Incorrect result", "Duplicate detected incorrectly",
+         "Duplicate was not detected", "Other"],
+        key="standalone_fb_type"
+    )
+    fb_standalone_comment = st.text_area(
+        "Comments",
+        key="standalone_fb_comment",
+        placeholder="Describe your feedback..."
+    )
+
+    if st.button("📩 Submit General Feedback", key="standalone_fb_submit"):
+        if fb_standalone_comment or fb_standalone_type:
+            try:
+                pipeline.history_manager.record_feedback(
+                    verification_id="GENERAL",
+                    certificate_id="N/A",
+                    faculty_name="N/A",
+                    fdp_name="N/A",
+                    feedback_type=fb_standalone_type,
+                    comment=fb_standalone_comment,
+                    is_duplicate_context=False
+                )
+                st.success("✅ Thank you! Your feedback has been saved.")
+            except Exception as e:
+                st.error(f"Error saving feedback: {e}")
+        else:
+            st.warning("Please provide feedback text or select a category.")
+
+# PAGE 7: ABOUT
 elif page == "ℹ️ About":
     st.markdown("""
     <div class='header-banner'>
@@ -664,6 +1086,9 @@ elif page == "ℹ️ About":
        - Unified application architecture & Streamlit UI.
        - Multi-day attendance lookup checking **every single date** in the FDP range.
        - Detection of **missing attendance** (distinguishing between entire missing month and individual missing date).
+       - **Duplicate certificate detection** using content-based fingerprinting (faculty, program, dates, institution).
+       - **Faculty + Department grouping** for organized certificate views.
+       - **Persistent feedback system** for verification accuracy tracking.
        - Feature engineering (17 domain features) without target leakage.
        - Machine Learning model training (Random Forest, Gradient Boosting, etc.) and inference.
        - Hybrid consensus engine: Rules ensure attendance conflicts cannot be silently overridden by ML.
@@ -676,6 +1101,7 @@ elif page == "ℹ️ About":
     - **Multi-Day FDPs:** Every day between Start Date and End Date is checked. Two OOD days and one Leave day $\\rightarrow$ **INVALID**.
     - **Missing Attendance:** Missing attendance data does **NOT** mean Valid or Invalid $\\rightarrow$ **NEEDS REVIEW**.
     - **Faculty Matching:** Faculty ID is primary. If faculty cannot be reliably matched $\\rightarrow$ **NEEDS REVIEW**.
+    - **Duplicate Detection:** Certificates are fingerprinted by faculty name, institution, FDP name, dates, and certificate number. Duplicate uploads are rejected without creating new records or inflating counts.
     """)
 
 st.markdown("""

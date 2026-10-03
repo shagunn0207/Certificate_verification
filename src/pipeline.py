@@ -25,8 +25,9 @@ class VerificationPipeline:
     ) -> Dict[str, Any]:
         """
         Executes end-to-end verification for an uploaded file:
-        File -> OCR -> Extraction -> Faculty Match -> Attendance Lookup ->
-        Rule Engine -> Feature Engineering -> ML Model -> Hybrid Result -> Audit History.
+        File -> OCR -> Extraction -> Faculty Match -> Duplicate Check ->
+        Attendance Lookup -> Rule Engine -> Feature Engineering -> ML Model ->
+        Hybrid Result -> Audit History.
         """
         # 1 & 2. Process File & OCR
         cert_data = self.cert_processor.process_uploaded_file(
@@ -34,6 +35,22 @@ class VerificationPipeline:
             filename=filename,
             fallback_meta=fallback_meta
         )
+
+        # 3. Duplicate Check — before running the full pipeline
+        if save_to_history:
+            duplicate_record = self.history_manager.find_duplicate(cert_data)
+            if duplicate_record:
+                return {
+                    "is_duplicate": True,
+                    "cert_data": cert_data,
+                    "duplicate_of": duplicate_record,
+                    "final_result": "DUPLICATE",
+                    "final_reason": "This certificate already exists in the system. No new record was added and counts were not increased.",
+                    # Provide empty structures for UI compatibility
+                    "rule_output": {},
+                    "ml_output": {"prediction": "N/A", "confidence": 0.0, "probabilities": {}},
+                    "features": {}
+                }
 
         return self._execute_core_pipeline(cert_data, save_to_history=save_to_history)
 
@@ -49,6 +66,22 @@ class VerificationPipeline:
         cert_data = self.cert_processor.process_existing_record(tracker_row)
         # Preserve the original tracker result for audit comparison (read-only reference)
         cert_data['TRACKER_ORIGINAL_RESULT'] = tracker_row.get('VERIFICATION RESULT', '').strip()
+
+        # Duplicate Check for existing certificates too
+        if save_to_history:
+            duplicate_record = self.history_manager.find_duplicate(cert_data)
+            if duplicate_record:
+                return {
+                    "is_duplicate": True,
+                    "cert_data": cert_data,
+                    "duplicate_of": duplicate_record,
+                    "final_result": "DUPLICATE",
+                    "final_reason": "This certificate already exists in the system. No new record was added and counts were not increased.",
+                    "rule_output": {},
+                    "ml_output": {"prediction": "N/A", "confidence": 0.0, "probabilities": {}},
+                    "features": {}
+                }
+
         return self._execute_core_pipeline(cert_data, save_to_history=save_to_history)
 
     def _execute_core_pipeline(self, cert_data: Dict[str, Any], save_to_history: bool = True) -> Dict[str, Any]:
@@ -94,6 +127,7 @@ class VerificationPipeline:
             final_reason = rule_reason
 
         response = {
+            "is_duplicate": False,
             "cert_data": cert_data,
             "rule_output": rule_output,
             "ml_output": ml_output,
