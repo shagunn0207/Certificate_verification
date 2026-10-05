@@ -43,12 +43,15 @@ function populateFDPSystem() {
   // Step 3: Update CERTIFICATE TRACKER
   updateCertificateTracker(ss, log);
 
-  // Step 4: Reorder tabs
+  // Step 4: Update TRAINING FEEDBACK
+  updateTrainingFeedback(ss, log);
+
+  // Step 5: Reorder tabs
   reorderTabs(ss);
 
   log.push("");
   log.push("============================================================");
-  log.push("ALL THREE TABS SUCCESSFULLY UPDATED AND VERIFIED.");
+  log.push("ALL FOUR TABS SUCCESSFULLY UPDATED AND VERIFIED.");
   log.push("============================================================");
 
   Logger.log(log.join("\n"));
@@ -287,7 +290,7 @@ function colourAttendanceSheet(sheet, lastRow) {
 }
 
 function reorderTabs(ss) {
-  var order = ["FACULTY MASTER", "ATTENDANCE SHEET", "CERTIFICATE TRACKER"];
+  var order = ["FACULTY MASTER", "ATTENDANCE SHEET", "CERTIFICATE TRACKER", "TRAINING FEEDBACK"];
   order.forEach(function(name, index) {
     var sheet = ss.getSheetByName(name);
     if (sheet) {
@@ -295,6 +298,117 @@ function reorderTabs(ss) {
       ss.moveActiveSheet(index + 1);
     }
   });
+}
+
+function updateTrainingFeedback(ss, log) {
+  log.push("");
+  log.push("--- INITIALIZING TRAINING FEEDBACK TAB ---");
+  var sheet = ss.getSheetByName("TRAINING FEEDBACK");
+  if (!sheet) {
+    sheet = ss.insertSheet("TRAINING FEEDBACK");
+    log.push("Created TRAINING FEEDBACK tab.");
+  }
+
+  var headers = [
+    "Feedback ID", "Created At", "Approved At", "Verification ID", "Certificate ID",
+    "Faculty ID", "Faculty Name", "Department", "Training Date", "Training Program",
+    "Program Type", "Presentation Rating", "Coverage of Topics", "Understanding Level",
+    "Understanding Reason", "Future Programs", "Recommended Topics", "Feedback Status",
+    "Rejection Reason"
+  ];
+
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    styliseHeader(sheet, headers.length);
+    sheet.setFrozenRows(1);
+    sheet.setColumnWidth(1, 180);
+    sheet.setColumnWidth(2, 140);
+    sheet.setColumnWidth(3, 140);
+    sheet.setColumnWidth(4, 180);
+    sheet.setColumnWidth(5, 120);
+    sheet.setColumnWidth(6, 110);
+    sheet.setColumnWidth(7, 200);
+    sheet.setColumnWidth(8, 140);
+    sheet.setColumnWidth(9, 110);
+    sheet.setColumnWidth(10, 280);
+    sheet.setColumnWidth(11, 120);
+    sheet.setColumnWidth(12, 130);
+    sheet.setColumnWidth(13, 300);
+    sheet.setColumnWidth(14, 130);
+    sheet.setColumnWidth(15, 300);
+    sheet.setColumnWidth(16, 110);
+    sheet.setColumnWidth(17, 300);
+    sheet.setColumnWidth(18, 130);
+    sheet.setColumnWidth(19, 200);
+  }
+  log.push("TRAINING FEEDBACK: verified canonical 19 columns.");
+}
+
+function doPost(e) {
+  try {
+    var SPREADSHEET_ID = "1xxtuaEqJ8ygGhcMDlPLiZK8OgPicUh-qIPSEa7MjPL4";
+    var data = JSON.parse(e.postData.contents);
+    var tabName = data.tab_name || "TRAINING FEEDBACK";
+    var rowValues = data.row_values;
+    var fid = data.record ? data.record["Feedback ID"] : (rowValues ? rowValues[0] : null);
+
+    if (!fid || !rowValues) {
+      return ContentService.createTextOutput(JSON.stringify({success: false, error: "Missing Feedback ID or row values"}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // MUST use openById() — getActiveSpreadsheet() returns null in Web App context
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var sheet = ss.getSheetByName(tabName);
+    if (!sheet) {
+      sheet = ss.insertSheet(tabName);
+      var headers = data.headers || [
+        "Feedback ID", "Created At", "Approved At", "Verification ID", "Certificate ID",
+        "Faculty ID", "Faculty Name", "Department", "Training Date", "Training Program",
+        "Program Type", "Presentation Rating", "Coverage of Topics", "Understanding Level",
+        "Understanding Reason", "Future Programs", "Recommended Topics", "Feedback Status",
+        "Rejection Reason"
+      ];
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      styliseHeader(sheet, headers.length);
+      sheet.setFrozenRows(1);
+    }
+
+    var lastRow = sheet.getLastRow();
+    var foundRow = null;
+    if (lastRow > 1) {
+      var idValues = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (var i = 0; i < idValues.length; i++) {
+        if (idValues[i][0] && idValues[i][0].toString().trim() === fid.toString().trim()) {
+          foundRow = i + 2;
+          break;
+        }
+      }
+    }
+
+    if (foundRow) {
+      // UPDATE in-place — same Feedback ID, same row, no new row added
+      sheet.getRange(foundRow, 1, 1, rowValues.length).setValues([rowValues]);
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true,
+        message: "Updated row " + foundRow + " for Feedback ID: " + fid,
+        row_index: foundRow,
+        action: "UPDATE"
+      })).setMimeType(ContentService.MimeType.JSON);
+    } else {
+      // INSERT — new Feedback ID, append once
+      sheet.appendRow(rowValues);
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true,
+        message: "Appended new row for Feedback ID: " + fid,
+        row_index: sheet.getLastRow(),
+        action: "INSERT"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({success: false, error: err.toString()}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 function styliseHeader(sheet, numCols) {
@@ -308,3 +422,4 @@ function styliseHeader(sheet, numCols) {
     .setVerticalAlignment("middle");
   sheet.setRowHeight(1, 32);
 }
+

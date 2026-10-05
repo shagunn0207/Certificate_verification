@@ -39,6 +39,28 @@ FEEDBACK_HEADERS = [
     "Is Duplicate Context"
 ]
 
+TRAINING_FEEDBACK_HEADERS = [
+    "Feedback ID",
+    "Created At",
+    "Approved At",
+    "Verification ID",
+    "Certificate ID",
+    "Faculty ID",
+    "Faculty Name",
+    "Department",
+    "Training Date",
+    "Training Program",
+    "Program Type",
+    "Presentation Rating",
+    "Coverage of Topics",
+    "Understanding Level",
+    "Understanding Reason",
+    "Future Programs",
+    "Recommended Topics",
+    "Feedback Status",
+    "Rejection Reason"
+]
+
 
 def _normalize_for_fingerprint(value: str) -> str:
     """
@@ -106,13 +128,18 @@ def compute_certificate_fingerprint(cert_data: Dict[str, Any]) -> str:
 class VerificationHistoryManager:
     def __init__(self, results_path: Optional[str] = None):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.results_dir = os.path.join(base_dir, "results")
+        default_results_dir = os.path.join(base_dir, "results")
+        self.results_dir = os.path.dirname(os.path.abspath(results_path)) if results_path else default_results_dir
         os.makedirs(self.results_dir, exist_ok=True)
 
         self.results_file = results_path or os.path.join(self.results_dir, "verification_results.csv")
         self.feedback_file = os.path.join(self.results_dir, "feedback.csv")
+        self.training_feedback_file = os.path.join(self.results_dir, "training_feedback.csv")
+        self.approved_feedback_file = os.path.join(self.results_dir, "approved_feedback.csv")
+        self.rejected_feedback_file = os.path.join(self.results_dir, "rejected_feedback.csv")
         self._ensure_file_exists()
         self._ensure_feedback_file_exists()
+        self._ensure_training_feedback_file_exists()
 
     def _ensure_file_exists(self):
         if not os.path.exists(self.results_file):
@@ -161,6 +188,89 @@ class VerificationHistoryManager:
             with open(self.feedback_file, mode='w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
                 writer.writerow(FEEDBACK_HEADERS)
+
+    def _ensure_training_feedback_file_exists(self):
+        """Create and migrate the training-feedback CSVs used by the MSRIT Feedback on Training workflow."""
+        for path in [self.training_feedback_file, self.approved_feedback_file, self.rejected_feedback_file]:
+            if not os.path.exists(path):
+                with open(path, mode='w', newline='', encoding='utf-8') as f:
+                    writer = csv.DictWriter(f, fieldnames=TRAINING_FEEDBACK_HEADERS)
+                    writer.writeheader()
+        self._migrate_training_feedback_files()
+
+    def _migrate_training_feedback_files(self):
+        """
+        Migrate training_feedback.csv, approved_feedback.csv, and rejected_feedback.csv
+        to ensure every row adheres to the canonical 19-column schema.
+        Handles legacy 27-column formats and misaligned rows safely without data loss.
+        """
+        for path in [self.training_feedback_file, self.approved_feedback_file, self.rejected_feedback_file]:
+            if not os.path.exists(path):
+                continue
+            try:
+                with open(path, mode='r', encoding='utf-8') as f:
+                    raw_lines = list(csv.reader(f))
+                if not raw_lines:
+                    with open(path, mode='w', newline='', encoding='utf-8') as f:
+                        writer = csv.DictWriter(f, fieldnames=TRAINING_FEEDBACK_HEADERS)
+                        writer.writeheader()
+                    continue
+
+                header = [h.strip() for h in raw_lines[0]]
+                needs_rewrite = False
+
+                if header != TRAINING_FEEDBACK_HEADERS:
+                    needs_rewrite = True
+
+                migrated_rows = []
+                for r in raw_lines[1:]:
+                    if not r or not any(field.strip() for field in r):
+                        continue
+                    if len(r) != 19:
+                        needs_rewrite = True
+
+                    if len(r) == 19 and header == TRAINING_FEEDBACK_HEADERS:
+                        row_dict = dict(zip(TRAINING_FEEDBACK_HEADERS, r))
+                        migrated_rows.append(row_dict)
+                    elif len(r) == 27:
+                        # Legacy 27-column row mapping:
+                        row_dict = {
+                            "Feedback ID": r[0],
+                            "Created At": r[1],
+                            "Approved At": r[4],
+                            "Verification ID": r[6],
+                            "Certificate ID": r[7],
+                            "Faculty ID": r[8],
+                            "Faculty Name": r[9],
+                            "Department": r[10],
+                            "Training Date": r[11],
+                            "Training Program": r[12],
+                            "Program Type": r[13] or "INTERNAL",
+                            "Presentation Rating": r[14] or "Good",
+                            "Coverage of Topics": r[15],
+                            "Understanding Level": r[16] or "Good",
+                            "Understanding Reason": r[17],
+                            "Future Programs": r[18] or "Yes",
+                            "Recommended Topics": r[19],
+                            "Feedback Status": (r[23] or "IN_PROGRESS").strip().upper(),
+                            "Rejection Reason": r[24],
+                        }
+                        migrated_rows.append(row_dict)
+                    else:
+                        # Map by existing header names if present
+                        row_dict = {}
+                        raw_dict = dict(zip(header, r))
+                        for col in TRAINING_FEEDBACK_HEADERS:
+                            row_dict[col] = raw_dict.get(col, "")
+                        migrated_rows.append(row_dict)
+
+                if needs_rewrite:
+                    with open(path, mode='w', newline='', encoding='utf-8') as f:
+                        writer = csv.DictWriter(f, fieldnames=TRAINING_FEEDBACK_HEADERS)
+                        writer.writeheader()
+                        writer.writerows(migrated_rows)
+            except Exception as e:
+                pass
 
     def find_duplicate(self, cert_data: Dict[str, Any]) -> Optional[Dict[str, str]]:
         """
@@ -266,6 +376,202 @@ class VerificationHistoryManager:
             writer = csv.DictWriter(f, fieldnames=FEEDBACK_HEADERS)
             writer.writerow(row)
 
+        return row
+
+    def create_training_feedback(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Creates or updates a training-feedback record using the canonical 19-column schema.
+        Guarantees zero column shifting, full quoting of special characters/newlines,
+        and maintains synchronized status datasets for APPROVED and REJECTED states.
+        """
+        existing_rows = self.get_all_training_feedback()
+        cert_id = str(data.get("Certificate ID") or data.get("certificate_id") or "").strip()
+        fid_target = str(data.get("Feedback ID") or data.get("feedback_id") or "").strip()
+
+        # Check if record exists by Feedback ID or Certificate ID
+        existing_idx = None
+        for idx, r in enumerate(existing_rows):
+            if fid_target and r.get("Feedback ID", "").strip() == fid_target:
+                existing_idx = idx
+                break
+            if cert_id and r.get("Certificate ID", "").strip() == cert_id:
+                existing_idx = idx
+                break
+
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        existing_row = existing_rows[existing_idx] if existing_idx is not None else None
+
+        status = str(data.get("Feedback Status") or data.get("status") or (existing_row.get("Feedback Status") if existing_row else "IN_PROGRESS")).strip().upper()
+        if not status or status == "PENDING":
+            status = "IN_PROGRESS"
+
+        feedback_id = fid_target or (existing_row.get("Feedback ID") if existing_row else None) or f"TFB-{datetime.now().strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:4].upper()}"
+        created_at = (existing_row.get("Created At") if existing_row else None) or data.get("Created At") or data.get("created_at") or now_str
+
+        # Determine Approved At
+        approved_at = ""
+        if status == "APPROVED":
+            approved_at = data.get("Approved At") or (existing_row.get("Approved At") if existing_row else "") or now_str
+        elif existing_row and existing_row.get("Approved At"):
+            approved_at = existing_row.get("Approved At")
+
+        # Determine Rejection Reason
+        rejection_reason = data.get("Rejection Reason") or data.get("rejection_reason") or (existing_row.get("Rejection Reason", "") if existing_row else "")
+        if status == "APPROVED":
+            rejection_reason = ""  # Clear rejection reason upon approval
+
+        # Exact canonical 19 columns mapping:
+        canonical_row = {
+            "Feedback ID": feedback_id,
+            "Created At": created_at,
+            "Approved At": approved_at,
+            "Verification ID": str(data.get("Verification ID") or data.get("verification_id") or (existing_row.get("Verification ID", "") if existing_row else "")),
+            "Certificate ID": cert_id or (existing_row.get("Certificate ID", "") if existing_row else ""),
+            "Faculty ID": str(data.get("Faculty ID") or data.get("faculty_id") or (existing_row.get("Faculty ID", "") if existing_row else "")),
+            "Faculty Name": str(data.get("Faculty Name") or data.get("faculty_name") or (existing_row.get("Faculty Name", "") if existing_row else "")),
+            "Department": str(data.get("Department") or data.get("department") or (existing_row.get("Department", "") if existing_row else "")),
+            "Training Date": str(data.get("Training Date") or data.get("training_date") or (existing_row.get("Training Date", "") if existing_row else "")),
+            "Training Program": str(data.get("Training Program") or data.get("training_program") or (existing_row.get("Training Program", "") if existing_row else "")),
+            "Program Type": str(data.get("Program Type") or data.get("program_type") or (existing_row.get("Program Type", "INTERNAL") if existing_row else "INTERNAL")),
+            "Presentation Rating": str(data.get("Presentation Rating") or data.get("presentation_rating") or (existing_row.get("Presentation Rating", "Good") if existing_row else "Good")),
+            "Coverage of Topics": str(data.get("Coverage of Topics") if data.get("Coverage of Topics") is not None else (data.get("coverage_of_topics") if data.get("coverage_of_topics") is not None else (existing_row.get("Coverage of Topics", "") if existing_row else ""))),
+            "Understanding Level": str(data.get("Understanding Level") or data.get("understanding_level") or (existing_row.get("Understanding Level", "Good") if existing_row else "Good")),
+            "Understanding Reason": str(data.get("Understanding Reason") if data.get("Understanding Reason") is not None else (data.get("understanding_reason") if data.get("understanding_reason") is not None else (existing_row.get("Understanding Reason", "") if existing_row else ""))),
+            "Future Programs": str(data.get("Future Programs") or data.get("future_programs") or (existing_row.get("Future Programs", "Yes") if existing_row else "Yes")),
+            "Recommended Topics": str(data.get("Recommended Topics") if data.get("Recommended Topics") is not None else (data.get("recommended_topics") if data.get("recommended_topics") is not None else (existing_row.get("Recommended Topics", "") if existing_row else ""))),
+            "Feedback Status": status,
+            "Rejection Reason": rejection_reason,
+        }
+
+        if existing_idx is not None:
+            existing_rows[existing_idx] = canonical_row
+        else:
+            existing_rows.append(canonical_row)
+
+        with open(self.training_feedback_file, mode='w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=TRAINING_FEEDBACK_HEADERS)
+            writer.writeheader()
+            writer.writerows(existing_rows)
+
+        self._write_status_dataset(self.approved_feedback_file, "APPROVED")
+        self._write_status_dataset(self.rejected_feedback_file, "REJECTED")
+
+        return canonical_row
+
+    def get_training_feedback_for_certificate(self, certificate_id: str) -> Optional[Dict[str, str]]:
+        """Return the training feedback record for a specific Certificate ID if any."""
+        if not certificate_id:
+            return None
+        rows = self.get_all_training_feedback()
+        for r in rows:
+            if r.get("Certificate ID", "").strip() == certificate_id.strip():
+                return r
+        return None
+
+    def get_training_feedback_stats(self) -> Dict[str, Any]:
+        """
+        Calculates live counts for training feedback dashboard:
+        - Total Valid Certificates
+        - Feedback Pending
+        - Feedback Approved
+        - Feedback Rejected
+        - Feedback Completion Rate
+        """
+        unique_records = self.get_unique_records()
+        valid_certs = [r for r in unique_records if r.get("Final Result", "").upper() == "VALID"]
+        total_valid = len(valid_certs)
+
+        all_tf = self.get_all_training_feedback()
+        status_by_cert = {}
+        for tf in all_tf:
+            cid = tf.get("Certificate ID", "").strip()
+            if cid:
+                status_by_cert[cid] = tf.get("Feedback Status", "").upper()
+
+        approved_count = sum(1 for status in status_by_cert.values() if status == "APPROVED")
+        rejected_count = sum(1 for status in status_by_cert.values() if status == "REJECTED")
+        pending_count = max(0, total_valid - approved_count)
+        completion_rate = (approved_count / max(1, total_valid)) * 100.0 if total_valid > 0 else 0.0
+
+        return {
+            "total_valid": total_valid,
+            "pending": pending_count,
+            "approved": approved_count,
+            "rejected": rejected_count,
+            "completion_rate": completion_rate,
+            "status_by_cert": status_by_cert
+        }
+
+    def get_all_training_feedback(self) -> List[Dict[str, str]]:
+        """Return all training-feedback records."""
+        if not os.path.exists(self.training_feedback_file):
+            return []
+        with open(self.training_feedback_file, mode='r', encoding='utf-8') as f:
+            return list(csv.DictReader(f))
+
+    def update_training_feedback(self, feedback_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, str]]:
+        """Update one training-feedback record by Feedback ID."""
+        rows = self.get_all_training_feedback()
+        if not rows:
+            return None
+
+        fieldnames = list(TRAINING_FEEDBACK_HEADERS)
+        updated_row = None
+        for row in rows:
+            if row.get("Feedback ID", "") == feedback_id:
+                for key, value in updates.items():
+                    if key in fieldnames:
+                        row[key] = "" if value is None else str(value)
+                updated_row = row
+                break
+
+        if updated_row is None:
+            return None
+
+        with open(self.training_feedback_file, mode='w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+
+        return updated_row
+
+    def _write_status_dataset(self, path: str, status: str):
+        """Write a filtered status dataset for easy export/use later."""
+        rows = [r for r in self.get_all_training_feedback() if r.get("Feedback Status", "").upper() == status]
+        with open(path, mode='w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=TRAINING_FEEDBACK_HEADERS)
+            writer.writeheader()
+            writer.writerows(rows)
+
+    def approve_training_feedback(self, feedback_id: str) -> Optional[Dict[str, str]]:
+        """Approve feedback and refresh the approved-feedback dataset."""
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        row = self.update_training_feedback(
+            feedback_id,
+            {
+                "Feedback Status": "APPROVED",
+                "Approved At": now_str,
+                "Rejection Reason": ""
+            }
+        )
+        if row:
+            self._write_status_dataset(self.approved_feedback_file, "APPROVED")
+            self._write_status_dataset(self.rejected_feedback_file, "REJECTED")
+        return row
+
+    def reject_training_feedback(self, feedback_id: str, reason: str) -> Optional[Dict[str, str]]:
+        """Reject feedback and refresh the rejected-feedback dataset."""
+        row = self.update_training_feedback(
+            feedback_id,
+            {
+                "Feedback Status": "REJECTED",
+                "Rejection Reason": reason,
+                "Approved At": ""
+            }
+        )
+        if row:
+            self._write_status_dataset(self.rejected_feedback_file, "REJECTED")
+            self._write_status_dataset(self.approved_feedback_file, "APPROVED")
         return row
 
     def get_all_feedback(self) -> List[Dict[str, str]]:

@@ -25,6 +25,7 @@ class DataLoader:
         self.tracker_file = os.path.join(self.data_dir, "certificate_tracker.csv")
 
         self.faculty_by_id: Dict[str, str] = {}
+        self.faculty_department_by_id: Dict[str, str] = {}
         self.faculty_by_name: Dict[str, Tuple[str, str]] = {}
         self.attendance_lookup: Dict[Tuple[str, str], str] = {}
         self.faculty_months_available: Dict[str, Set[str]] = defaultdict(set)
@@ -48,6 +49,7 @@ class DataLoader:
 
     def _load_faculty(self):
         self.faculty_by_id = {}
+        self.faculty_department_by_id = {}
         self.faculty_by_name = {}
 
         if not os.path.exists(self.faculty_file):
@@ -58,8 +60,10 @@ class DataLoader:
             for row in reader:
                 fid = row.get('FACULTY ID', '').strip()
                 fname = row.get('FACULTY NAME', '').strip()
+                department = row.get('DEPARTMENT', '').strip()
                 if fid:
                     self.faculty_by_id[fid] = fname
+                    self.faculty_department_by_id[fid] = department
                     norm_key = self._normalize_name_key(fname)
                     self.faculty_by_name[norm_key] = (fid, fname)
                     # Also map exact lowercase
@@ -163,6 +167,17 @@ class DataLoader:
 
         return None
 
+
+    def get_faculty_department(self, faculty_id: Optional[str] = None, faculty_name: Optional[str] = None) -> str:
+        """Return the faculty department when it exists in faculty_master.csv."""
+        if faculty_id:
+            department = self.faculty_department_by_id.get(faculty_id.strip(), "")
+            if department:
+                return department
+        match = self.find_faculty(faculty_id=faculty_id, faculty_name=faculty_name)
+        if match:
+            return self.faculty_department_by_id.get(match[0], "")
+        return ""
 
     def get_attendance(self, faculty_id: str, date_str: str) -> Optional[str]:
         """
