@@ -1943,7 +1943,7 @@ elif page == "🔍 Verify New Certificate":
 elif page == "📁 Existing Certificates":
     st.markdown("""
     <div class='header-banner'>
-        <h1 style='margin:0; font-size:26px; font-weight:800;'>📁 Existing Certificates (Person 1 Tracker)</h1>
+        <h1 style='margin:0; font-size:26px; font-weight:800;'>📁 Existing Certificates</h1>
         <p style='margin:4px 0 0 0; color:#94a3b8; font-size:14px;'>
             Certificates pre-registered in the system. Select any certificate to re-verify through the automated pipeline.
         </p>
@@ -1970,8 +1970,16 @@ elif page == "📁 Existing Certificates":
             filtered_df = filtered_df[filtered_df.apply(lambda row: st_query in str(row).lower(), axis=1)]
 
         st.caption(f"Showing {len(filtered_df)} of {len(df_tracker)} certificates")
+        display_cols = [
+            "CERTIFICATE ID", "FACULTY ID", "FACULTY NAME",
+            "FDP / PROGRAM NAME", "PROGRAM INSTITUTION",
+            "PROGRAM TYPE", "START DATE", "END DATE", "VERIFICATION RESULT"
+        ]
+        table_df = pd.DataFrame([{col: str(r.get(col, "") or "") for col in display_cols} for r in filtered_df.to_dict(orient="records")])
+        table_df.columns.name = None
+        table_df.index.name = None
         st.dataframe(
-            filtered_df[["CERTIFICATE ID", "FACULTY ID", "FACULTY NAME", "FDP / PROGRAM NAME", "PROGRAM INSTITUTION", "PROGRAM TYPE", "START DATE", "END DATE", "VERIFICATION RESULT"]],
+            table_df,
             use_container_width=True,
             hide_index=True
         )
