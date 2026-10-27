@@ -192,7 +192,7 @@ pip install -r requirements.txt
 ```bash
 python -m unittest discover tests
 ```
-*Expected: 19 tests run with 100% pass rate.*
+*Expected: 42 tests run (19 verification pipeline tests + 23 appraisal engine tests) with 100% pass rate.*
 
 ### 3. Launch the Web Application
 ```bash
