@@ -147,41 +147,55 @@ class VerificationHistoryManager:
                 writer = csv.writer(f)
                 writer.writerow(HISTORY_HEADERS)
         else:
-            # Migrate existing file: add Fingerprint column if missing
-            self._migrate_add_fingerprint_column()
+            self._migrate_results_file()
 
-    def _migrate_add_fingerprint_column(self):
-        """Add Fingerprint column to existing verification_results.csv if missing."""
+    def _migrate_results_file(self):
+        """
+        Migrate verification_results.csv to ensure all rows match HISTORY_HEADERS (19 columns).
+        Handles legacy 17-column format (which lacked Tracker Original Result and Agreement)
+        and missing Fingerprint columns.
+        """
         try:
             with open(self.results_file, mode='r', encoding='utf-8') as f:
                 reader = csv.reader(f)
-                header = next(reader, None)
-                if header and "Fingerprint" not in header:
-                    # Need to add the column
-                    rows = []
-                    rows.append(header + ["Fingerprint"])
-                    for row in reader:
-                        # Compute fingerprint from existing fields
-                        # Map header to values
-                        row_dict = dict(zip(header, row))
-                        fp_parts = [
-                            _normalize_name_for_fingerprint(row_dict.get("Faculty Name", "")),
-                            _normalize_for_fingerprint(row_dict.get("Faculty ID", "")),
-                            _normalize_for_fingerprint(row_dict.get("Institution", "")),
-                            _normalize_for_fingerprint(row_dict.get("FDP Name", "")),
-                            _normalize_date_for_fingerprint(row_dict.get("Start Date", "")),
-                            _normalize_date_for_fingerprint(row_dict.get("End Date", "")),
-                            _normalize_for_fingerprint(row_dict.get("Certificate ID", "")),
-                        ]
-                        fingerprint = "||".join(fp_parts)
-                        row.append(fingerprint)
-                        rows.append(row)
+                lines = list(reader)
+            if not lines:
+                with open(self.results_file, mode='w', newline='', encoding='utf-8') as wf:
+                    writer = csv.writer(wf)
+                    writer.writerow(HISTORY_HEADERS)
+                return
 
-                    with open(self.results_file, mode='w', newline='', encoding='utf-8') as wf:
-                        writer = csv.writer(wf)
-                        writer.writerows(rows)
+            header = [h.strip() for h in lines[0]]
+            needs_rewrite = (header != HISTORY_HEADERS) or any(len(r) != len(HISTORY_HEADERS) for r in lines[1:] if r)
+            if not needs_rewrite:
+                return
+
+            migrated = [HISTORY_HEADERS]
+            for r in lines[1:]:
+                if not r or not any(field.strip() for field in r):
+                    continue
+                if len(r) == 19 and header == HISTORY_HEADERS:
+                    migrated.append(r)
+                elif len(r) == 17:
+                    # Legacy 17-column format: insert empty Tracker Original Result and Agreement before Reason and Fingerprint
+                    new_row = r[:15] + ['', ''] + r[15:]
+                    migrated.append(new_row)
+                elif len(r) == 18:
+                    new_row = r[:15] + ['', ''] + r[15:16] + [r[16] if len(r) > 16 else '']
+                    if len(new_row) < 19:
+                        new_row += [''] * (19 - len(new_row))
+                    migrated.append(new_row[:19])
+                elif len(r) == 19:
+                    migrated.append(r)
+                else:
+                    new_row = r + [''] * max(0, 19 - len(r))
+                    migrated.append(new_row[:19])
+
+            with open(self.results_file, mode='w', newline='', encoding='utf-8') as wf:
+                writer = csv.writer(wf)
+                writer.writerows(migrated)
         except Exception:
-            pass  # Don't break on migration errors
+            pass
 
     def _ensure_feedback_file_exists(self):
         if not os.path.exists(self.feedback_file):
@@ -590,7 +604,11 @@ class VerificationHistoryManager:
             return []
         with open(self.results_file, mode='r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
-            return list(reader)
+            records = []
+            for r in reader:
+                clean_r = {k: v for k, v in r.items() if k is not None and str(k).strip() and str(k).lower() != "nan"}
+                records.append(clean_r)
+            return records
 
     def get_unique_records(self) -> List[Dict[str, str]]:
         """

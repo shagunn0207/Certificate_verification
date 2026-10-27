@@ -1,2 +1,4 @@
 Feedback ID,Timestamp,Verification ID,Certificate ID,Faculty Name,FDP Name,Feedback Type,Comment,Is Duplicate Context
 FB-20261005201224-C8B3,2026-10-05 20:12:24,GENERAL,N/A,N/A,N/A,Correct result,,No
+FB-20261028005433-A040,2026-10-28 00:54:33,GENERAL,N/A,N/A,N/A,Duplicate was not detected,,No
+FB-20261028013059-698A,2026-10-28 01:30:59,VERIF-20260927123334-81E2,CERT-028,Swetha M,"Quantum Computing as a Cloud Service (QCaaS): Tools, Algorithms, and Use Cases",Yes — duplicate detected correctly,,Yes

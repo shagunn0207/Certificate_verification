@@ -7,8 +7,8 @@ Institutional Appraisal Rules:
 - Point 17: No. of events participated inside the institute (FDP/Seminar/Workshop/Conference)
 
 Key Principles:
-1. Points 16 and 17 are calculated based on qualifying participation (attendance evidence),
-   independently of certificate verification outcomes.
+1. Points 16 and 17 are counted from ALL certificates/events regardless of verification outcome
+   (Valid or Invalid certificates are both counted — only the venue classification matters).
 2. Events at Ramaiah Institute of Technology (MSRIT/RIT) are Internal (Point 17).
 3. Events at other institutions are External (Point 16).
 4. Events with unknown/unconfirmed venues are flagged as 'Pending Classification'.
@@ -236,19 +236,14 @@ def compute_appraisal(
     report_rows = []
 
     # 3. Classify and evaluate each unique event
+    # All events are counted into Point 16 or Point 17 based solely on venue.
+    # Certificate validity (Valid/Invalid) and attendance status do NOT gate inclusion.
     for e in events.values():
         cls_venue = classify_venue(e["venue"], cfg.get("internalAliases"))
         contrib = "Neither"
         why = ""
 
-        # Determine contribution to appraisal based strictly on attendance / participation evidence
-        if e["attended"] is False:
-            contrib = "Neither"
-            why = "Attendance record marks the faculty as not attended."
-        elif e["attended"] is not True:
-            contrib = "Pending Classification"
-            why = "Participation evidence insufficient (no attendance record)."
-        elif cls_venue == "Unknown":
+        if cls_venue == "Unknown":
             contrib = "Pending Classification"
             why = "Event venue could not be established."
         elif period_range and not e["start"]:

@@ -2073,8 +2073,11 @@ elif page == "📜 Verification History":
 
         st.caption(f"Showing {len(filtered_hist)} of {len(df_hist)} log entries")
         # Display without Fingerprint column for cleaner UI
-        display_cols = [c for c in filtered_hist.columns if c != "Fingerprint"]
-        st.dataframe(filtered_hist[display_cols], use_container_width=True, hide_index=True)
+        display_cols = [c for c in filtered_hist.columns if c and c != "Fingerprint" and str(c).lower() != "nan"]
+        table_hist = pd.DataFrame([{col: str(r.get(col, "") or "") for col in display_cols} for r in filtered_hist.to_dict(orient="records")])
+        table_hist.columns.name = None
+        table_hist.index.name = None
+        st.dataframe(table_hist, use_container_width=True, hide_index=True)
 
         csv_buffer = io.StringIO()
         filtered_hist.to_csv(csv_buffer, index=False)
@@ -2272,42 +2275,49 @@ elif page == "ℹ️ About":
     """, unsafe_allow_html=True)
 
     st.markdown("""
-    ### 🎯 System Purpose & Architecture
-    This application verifies Faculty Development Program (FDP) certificates submitted by faculty members of **Ramaiah Institute of Technology (MSRIT)**. It integrates:
-    
-    1. **PERSON 1 Responsibilities:**
-       - `faculty_master.csv`: 32 Verified Faculty Records (F001–F032).
-       - `attendance_sheet.csv`: 426 Official daily attendance logs with 7 institutional statuses.
-       - `certificate_tracker.csv`: 42 Institutional submissions.
-       - Source of truth for institutional verification rules.
+    ### 🎯 Project Overview
+    The **FDP Certificate Verification System** is an end-to-end AI/ML-powered application built for 
+    **Ramaiah Institute of Technology (MSRIT)**, Department of Artificial Intelligence & Machine Learning. 
+    It automates the verification of Faculty Development Program (FDP) certificates submitted by faculty members, 
+    replacing a manual, error-prone process with an intelligent, data-driven pipeline.
 
-    2. **PERSON 2 Responsibilities:**
-       - Certificate OCR & Text Extraction.
-       - Faculty Identification & Institution normalization (MSRIT, RIT, M.S. Ramaiah Institute of Technology).
-       - Timeline & date range generation.
-       - Initial rule logic & edge-case testing.
+    ### 🛠️ Technology Stack
+    | Component | Technology |
+    |-----------|-----------|
+    | **Frontend** | Streamlit (Python-based interactive web UI) |
+    | **Backend** | Python 3.x |
+    | **Machine Learning** | Scikit-learn (Random Forest, Gradient Boosting) |
+    | **OCR & Text Extraction** | PyTesseract, pdf2image |
+    | **Data Storage** | CSV-based persistent storage |
+    | **Visualization** | Plotly, Streamlit native charts |
 
-    3. **PERSON 3 (This Application):**
-       - Unified application architecture & Streamlit UI.
-       - Multi-day attendance lookup checking **every single date** in the FDP range.
-       - Detection of **missing attendance** (distinguishing between entire missing month and individual missing date).
-       - **Duplicate certificate detection** using content-based fingerprinting (faculty, program, dates, institution).
-       - **Faculty + Department grouping** for organized certificate views.
-       - **Persistent feedback system** for verification accuracy tracking.
-       - Feature engineering (17 domain features) without target leakage.
-       - Machine Learning model training (Random Forest, Gradient Boosting, etc.) and inference.
-       - Hybrid consensus engine: Rules ensure attendance conflicts cannot be silently overridden by ML.
-       - Real-time reactive dashboard & complete verification history audit log.
+    ### 📋 Key Features
+    - **Automated Certificate Verification** — Upload a PDF/image certificate and get an instant verification result through a multi-stage pipeline (OCR → Faculty Matching → Attendance Lookup → ML Prediction → Rule Engine).
+    - **Multi-Day Attendance Validation** — Every single date in an FDP date range is individually checked against the official attendance sheet, detecting conflicts like Casual Leave, Emergency Leave, or Unpaid Leave.
+    - **Hybrid Consensus Engine** — Combines ML model predictions with rule-based verification. Institutional rules ensure that attendance conflicts cannot be silently overridden by the ML model.
+    - **Duplicate Certificate Detection** — Content-based fingerprinting (faculty name, institution, FDP name, dates) prevents duplicate uploads from inflating verification counts.
+    - **Faculty Self-Appraisal Form** — Automatically populates Activity Points 16 (External events) and 17 (Internal events) from verified certificate records, with a printable Certificate Verification Summary Report.
+    - **Real-Time Dashboard** — Live analytics showing verification statistics, attendance conflict breakdowns, monthly distribution charts, and faculty-grouped certificate summaries.
+    - **Complete Verification History** — Full audit log of every certificate processed, with filtering by result, program type, and faculty member.
+    - **Feedback System** — Users can submit feedback on verification results to help improve the system over time.
+    - **Training Feedback Loop** — Verified results can be fed back into the ML model training pipeline for continuous improvement.
+
+    ### 📊 Data Pipeline
+    The system works with three core datasets:
+    - **Faculty Master** (`faculty_master.csv`) — 32 verified faculty records (F001–F032) with names, IDs, and departments.
+    - **Attendance Sheet** (`attendance_sheet.csv`) — 426 official daily attendance logs with 7 institutional statuses (PRESENT, OOD, HOLIDAY, CASUAL LEAVE, EMERGENCY LEAVE, UNPAID LEAVE, and missing).
+    - **Certificate Tracker** (`certificate_tracker.csv`) — 42 pre-registered institutional FDP certificate submissions with verification results.
 
     ### ⚖️ Core Institutional Rules
     - **Internal vs External:** Refers to the **FDP/Program Institution**, NOT the faculty member.
-      - Conducted at Ramaiah Institute of Technology $\\rightarrow$ **INTERNAL** (requires `PRESENT` or `HOLIDAY`).
-      - Conducted at external university/organization $\\rightarrow$ **EXTERNAL** (requires `OOD` or `HOLIDAY`).
-    - **Multi-Day FDPs:** Every day between Start Date and End Date is checked. Two OOD days and one Leave day $\\rightarrow$ **INVALID**.
-    - **Missing Attendance:** Missing attendance data does **NOT** mean Valid or Invalid $\\rightarrow$ **NEEDS REVIEW**.
-    - **Faculty Matching:** Faculty ID is primary. If faculty cannot be reliably matched $\\rightarrow$ **NEEDS REVIEW**.
+      - Conducted at Ramaiah Institute of Technology → **INTERNAL** (requires `PRESENT` or `HOLIDAY`).
+      - Conducted at external university/organization → **EXTERNAL** (requires `OOD` or `HOLIDAY`).
+    - **Multi-Day FDPs:** Every day between Start Date and End Date is checked individually.
+    - **Missing Attendance:** Missing attendance data does **NOT** mean Valid or Invalid → **NEEDS REVIEW**.
+    - **Faculty Matching:** Faculty ID is the primary key. If faculty cannot be reliably matched → **NEEDS REVIEW**.
     - **Duplicate Detection:** Certificates are fingerprinted by faculty name, institution, FDP name, dates, and certificate number. Duplicate uploads are rejected without creating new records or inflating counts.
     """)
+
 
 st.markdown("""
 <div style='text-align: center; margin-top: 40px; padding: 20px; color: #64748b; font-size: 13px; border-top: 1px solid rgba(255,255,255,0.05);'>

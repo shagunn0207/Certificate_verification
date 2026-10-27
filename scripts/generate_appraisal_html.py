@@ -144,9 +144,7 @@ function compute(fac,data,y1,cfg=CONFIG){
  const rng=periodRange(y1,cfg);let p16=0,p17=0;const rows=[];
  for(const e of ev.values()){
   const cls=classify(e.venue,cfg);let contrib,why='';
-  if(e.attended===false){contrib='Neither';why='Attendance record marks the faculty as not attended.';}
-  else if(e.attended!==true){contrib='Pending Classification';why='Participation evidence insufficient (no attendance record).';}
-  else if(cls==='Unknown'){contrib='Pending Classification';why='Event venue could not be established.';}
+  if(cls==='Unknown'){contrib='Pending Classification';why='Event venue could not be established.';}
   else if(cfg.period&&!e.start){contrib='Pending Classification';why='Event dates require confirmation.';}
   else if(!inPeriod(e.start,rng)){contrib='Neither';why='Event falls outside the appraisal period.';}
   else if(cls==='Internal'){contrib='Point 17';p17++;}else{contrib='Point 16';p16++;}
@@ -204,23 +202,19 @@ function renderBar(){
  $('dataBar').innerHTML=names.map(k=>DATA[k]?'<span class="ok">'+k+': '+DATA[k].length+' records</span>':'<span class="bad">'+k+': unavailable'+(DATA.errors[k]?' ('+esc(DATA.errors[k])+')':'')+'</span>').join(' &nbsp;|&nbsp; ')
   +' <button class="btn btn-sm btn-outline-secondary ms-2" id="bReload">Reload datasets</button>';
  $('bReload').onclick=()=>{loadData();};
- $('facList').innerHTML=(DATA.faculty||[]).map(f=>'<option value="'+esc(f.name+' — '+(f.department||'dept n/a')+' ['+f.id+']')+'">').join('');
+ $('facList').innerHTML=(DATA.faculty||[]).map(f=>'<option value="'+esc(f.name)+'">' ).join('');
 }
 function resolveFaculty(){
  const v=$('name').value.trim();const list=DATA.faculty;
  if(!list)return{err:'Faculty master dataset is unavailable; cannot identify the faculty member.'};
- const m=v.match(/\\[([^\\]]+)\\]\\s*$/);
- if(m){const f=list.find(x=>String(x.id)===m[1]);return f?{f}:{err:'Selected faculty ID not found.'};}
  const hits=list.filter(x=>norm(x.name)===norm(v));
  if(hits.length===1)return{f:hits[0]};
- if(hits.length>1)return{err:'Several faculty share this name. Pick one from the suggestion list (name — department [ID]).'};
+ if(hits.length>1)return{err:'Several faculty share this name. Please contact the administrator.'};
  return{err:'No faculty record matches. Pick a name from the suggestion list.'};
 }
 function onName(){
  const r=resolveFaculty();state.facId=r.f?r.f.id:null;
- if(r.f){$('match').textContent='Matched faculty ID: '+r.f.id;$('name').value=r.f.name;
-  if(r.f.department)$('dept').value=r.f.department;
-  if(['Assistant Professor','Associate Professor','Professor'].includes(r.f.designation))$('desig').value=r.f.designation;}
+ if(r.f){$('match').textContent='Matched faculty ID: '+r.f.id;$('name').value=r.f.name;}
  else $('match').textContent=$('name').value?'Not matched to a faculty record':'';
  state.result=null;save();
 }
@@ -232,7 +226,6 @@ function autofill(){
  if(!DATA.attendance){say('Attendance dataset is unavailable ('+esc(DATA.errors.attendance||'not loaded')+'). Points 16/17 were NOT calculated — this is a data failure, not a zero result.','danger');renderReport(null,r.f);return;}
  const res=compute(r.f,DATA,+$('y1').value);state.result=res;
  $('p16').value=res.p16;$('p17').value=res.p17;
- if(!$('dept').value&&r.f.department)$('dept').value=r.f.department;
  let m='Calculation succeeded for <b>'+esc(r.f.name)+'</b>: Point 16 = '+res.p16+', Point 17 = '+res.p17+'.';
  if(!res.rows.length)m+=' No event records were found for this faculty (genuine zero, datasets loaded).';
  if(res.flagged)m+=' <b>'+res.flagged+'</b> event(s) flagged for review (Pending Classification).';
@@ -252,7 +245,7 @@ function renderReport(res,f){
  if(!res.rows.length)h+='<div>No event or certificate records found for this faculty member.</div>';
  else h+='<div class="rt"><table><thead><tr><th>Sl. No.</th><th>Certificate/Event Name</th><th>Institution or Event Venue</th><th>Event Date or Date Range</th><th>Event Classification</th><th>Certificate Status</th><th>Verification Reason</th><th>Contribution to Appraisal</th></tr></thead><tbody>'
   +res.rows.map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.venue||'Not available')+'</td><td>'+esc(r.dates||'Not available')+'</td><td>'+(r.cls==='Unknown'?'Unknown (review)':r.cls)+'</td><td>'+(r.st||'No certificate submitted')+'</td><td>'+esc(r.reason||'—')+'</td><td>'+r.contrib+(r.why?'<br><small>'+esc(r.why)+'</small>':'')+'</td></tr>').join('')+'</tbody></table></div>';
- h+='<p class="small mt-2">Points 16/17 reflect attended events classified by venue; certificate status does not affect them.</p>';
+ h+='<p class="small mt-2">Points 16/17 reflect all certificates/events classified by venue (Internal/External); certificate validity does not affect the count.</p>';
  $('repBody').innerHTML=h;
 }
 function calc(){

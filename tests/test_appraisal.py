@@ -216,7 +216,7 @@ class TestRequirement10_MissingVenueDepartment(unittest.TestCase):
 
 
 class TestRequirement11_AttendanceNullGivesPendingClassification(unittest.TestCase):
-    """REQ-11: attended=null (None) -> Pending Classification, not counted."""
+    """REQ-11: Updated rule: events are counted by venue (External -> p16) regardless of attendance status."""
     def test_attended_none(self):
         fac = make_faculty()
         data = {
@@ -226,10 +226,8 @@ class TestRequirement11_AttendanceNullGivesPendingClassification(unittest.TestCa
             "certificates": []
         }
         res = compute_appraisal(fac, data)
-        self.assertEqual(res["p16"], 0)
+        self.assertEqual(res["p16"], 1)
         self.assertEqual(res["p17"], 0)
-        # Event should be flagged
-        self.assertGreater(res["flagged"], 0)
 
 
 class TestRequirement12_PeriodFilteringExcludesOutsideEvents(unittest.TestCase):
