@@ -18,6 +18,7 @@ Key Principles:
 import os
 import json
 import re
+import math
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
 from src.utils import normalize_institution, is_internal_program, generate_date_range, normalize_date_to_ddmmyyyy
@@ -30,11 +31,19 @@ INTERNAL_ALIASES = [
     "rit"
 ]
 
+def _safe_str(val: Any) -> str:
+    """Convert None, float('nan'), or any non-string into a clean stripped string."""
+    if val is None:
+        return ""
+    if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+        return ""
+    return str(val).strip()
+
 def norm_str(s: Any) -> str:
     """Normalizes string for comparison by removing non-alphanumeric chars."""
     if s is None:
         return ""
-    return re.sub(r'[^a-z0-9]+', ' ', str(s).lower()).strip()
+    return re.sub(r'[^a-z0-9]+', ' ', _safe_str(s).lower()).strip()
 
 def classify_venue(venue: str, aliases: Optional[List[str]] = None) -> str:
     """
@@ -324,10 +333,12 @@ def build_appraisal_datasets(data_loader) -> Dict[str, List[Dict[str, Any]]]:
     # 1. Faculty dataset
     faculty_list = []
     for fid, fname in data_loader.faculty_by_id.items():
-        dept = data_loader.faculty_department_by_id.get(fid, "") or "Artificial Intelligence & Machine Learning"
+        s_fid = _safe_str(fid)
+        s_fname = _safe_str(fname)
+        dept = _safe_str(data_loader.faculty_department_by_id.get(s_fid, "")) or "Artificial Intelligence & Machine Learning"
         faculty_list.append({
-            "id": fid,
-            "name": fname,
+            "id": s_fid,
+            "name": s_fname,
             "department": dept,
             "designation": "Assistant Professor"
         })
@@ -337,16 +348,16 @@ def build_appraisal_datasets(data_loader) -> Dict[str, List[Dict[str, Any]]]:
     att_list = []
 
     for idx, r in enumerate(tracker_rows, 1):
-        cid = r.get("CERTIFICATE ID", f"CERT-{idx:03d}").strip()
-        fid = r.get("FACULTY ID", "").strip()
-        fname = r.get("FACULTY NAME", "").strip()
-        pname = r.get("FDP / PROGRAM NAME", "").strip()
-        venue = r.get("PROGRAM INSTITUTION", "").strip()
-        ptype = r.get("PROGRAM TYPE", "").strip().upper()
-        s_date = r.get("START DATE", "").strip()
-        e_date = r.get("END DATE", "").strip()
-        vres = r.get("VERIFICATION RESULT", "").strip().upper()
-        reason = r.get("VERIFICATION REASON", "").strip()
+        cid = _safe_str(r.get("CERTIFICATE ID")) or f"CERT-{idx:03d}"
+        fid = _safe_str(r.get("FACULTY ID"))
+        fname = _safe_str(r.get("FACULTY NAME"))
+        pname = _safe_str(r.get("FDP / PROGRAM NAME"))
+        venue = _safe_str(r.get("PROGRAM INSTITUTION"))
+        ptype = _safe_str(r.get("PROGRAM TYPE")).upper()
+        s_date = _safe_str(r.get("START DATE"))
+        e_date = _safe_str(r.get("END DATE"))
+        vres = _safe_str(r.get("VERIFICATION RESULT")).upper()
+        reason = _safe_str(r.get("VERIFICATION REASON"))
         
         status_str = "Valid" if vres == "VALID" else ("Invalid" if vres == "INVALID" else "Pending Review")
         event_id = f"EVT-{idx:03d}"
