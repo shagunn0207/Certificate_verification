@@ -281,6 +281,7 @@ with st.sidebar:
             "📊 Dashboard",
             "🔍 Verify New Certificate",
             "📝 Training Feedback",
+            "📋 Faculty Self-Appraisal",
             "📁 Existing Certificates",
             "📜 Verification History",
             "🤖 Model Performance",
@@ -1392,6 +1393,67 @@ def render_training_feedback_dashboard():
                     st.rerun()
 
 
+def render_faculty_self_appraisal():
+    """
+    Renders the Faculty Self-Appraisal Form and Certificate Verification Summary Report.
+    Adheres to the official Ramaiah Institute of Technology annual appraisal format:
+    - Activity Row 16: Events participated outside the institute (FDP/Seminar/Workshop/Conference)
+    - Activity Row 17: Events participated inside the institute (FDP/Seminar/Workshop/Conference)
+    - Contains ONLY rows 16 and 17.
+    - Section B: Certificate Verification Summary Report.
+    - Synchronized with project datasets (data/faculty.json, data/attendance.json, data/certificates.json).
+    """
+    import streamlit.components.v1 as components
+    from src.appraisal import export_appraisal_json_files
+
+    st.markdown("""
+    <div class='header-banner'>
+        <h1 style='margin:0; font-size:26px; font-weight:800;'>📋 Faculty Self-Appraisal & Verification Report</h1>
+        <p style='margin:4px 0 0 0; color:#94a3b8; font-size:14px;'>
+            Ramaiah Institute of Technology • Autonomous Institute, affiliated to VTU<br>
+            Annual Faculty Self-Appraisal System for Activity Points 16 (External) and 17 (Internal).
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    c1, c2, c3 = st.columns([2, 1, 1])
+    with c1:
+        st.caption("ℹ️ The appraisal form uses project attendance and certificate records to automatically calculate Points 16 & 17, and generates an official Certificate Verification Summary Report for printing.")
+    with c2:
+        if st.button("🔄 Sync Appraisal Datasets", key="sync_appraisal_btn"):
+            try:
+                export_appraisal_json_files(pipeline.data_loader)
+                import subprocess
+                subprocess.run(["python", "scripts/generate_appraisal_html.py"], check=True)
+                st.success("Appraisal datasets and HTML updated successfully!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error syncing appraisal datasets: {e}")
+    with c3:
+        html_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "appraisal_form.html")
+        if os.path.exists(html_file):
+            with open(html_file, "r", encoding="utf-8") as f:
+                html_data = f.read()
+            st.download_button(
+                label="📥 Download HTML Form",
+                data=html_data,
+                file_name="appraisal_form.html",
+                mime="text/html",
+                key="dl_appraisal_btn"
+            )
+
+    html_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "appraisal_form.html")
+    if not os.path.exists(html_file):
+        export_appraisal_json_files(pipeline.data_loader)
+        import subprocess
+        subprocess.run(["python", "scripts/generate_appraisal_html.py"], check=True)
+
+    with open(html_file, "r", encoding="utf-8") as f:
+        html_content = f.read()
+
+    components.html(html_content, height=1450, scrolling=True)
+
+
 # PAGE 1: DASHBOARD
 if page == "📊 Dashboard":
     st.markdown("""
@@ -2123,6 +2185,10 @@ elif page == "🤖 Model Performance":
 # PAGE: TRAINING FEEDBACK (MSRIT/IQAC Feedback Dashboard & Form)
 elif page == "📝 Training Feedback":
     render_training_feedback_dashboard()
+
+# PAGE: FACULTY SELF-APPRAISAL
+elif page == "📋 Faculty Self-Appraisal":
+    render_faculty_self_appraisal()
 
 # PAGE 6: FEEDBACK
 elif page == "💬 Feedback":
